@@ -167,16 +167,17 @@ ul.Announcements {
 }
 li.New { background: #ffd /* Discussion New Background Color */; }
 ul.DataList li ul li.Meta a.Category {
-   background: #fafafa;
+	 background: url(data0d.gif) repeat-x;
+   border: 1px solid #e69999;
    padding: 2px 4px;
    -moz-border-radius: 2px;
    -webkit-border-radius: 2px;
 }
 ul.DataList li.Mine ul li.Meta a.Category {
-   background: #fafdff;
+	 background: url(data0d.gif) repeat-x;
 }
 ul.DataList li.New ul li.Meta a.Category {
-   background: #ffe;
+	 background: url(data0d.gif) repeat-x;
 }
 
 /* =============================================================== Categories */
@@ -188,6 +189,7 @@ ul.DataList li.New ul li.Meta a.Category {
 body.Categories h1,
 body.Categories #Content h2 {
    margin: 0;
+   margin-top: 1em;
 }
 h1 span {
    color: #555 /* Body Text Font Color */;

@@ -1381,7 +1381,6 @@ ul.Tabs li {
 ul.Tabs {
    clear: left;
    display: block;
-   border-bottom: 1px solid #caf0fe /* Panel Inlay Border Color */;
    padding: 10px 0 0 10px;
    margin: 0;
 }
@@ -1389,6 +1388,7 @@ ul.Tabs li {
    padding: 5px 0;
    margin: 0;
    line-height: 24px;
+   background: url(tab-left.gif) no-repeat 0% 0%;
    -moz-border-radius-topleft: 3px;
    -moz-border-radius-topright: 3px;
    -webkit-border-top-left-radius: 3px;
@@ -1408,21 +1408,20 @@ ul.Tabs li a:visited {
    -webkit-border-top-left-radius: 3px;
    -webkit-border-top-right-radius: 3px;
    display: inline;
-   background: #daf4fd /* Panel Inlay Background Color */;
+   background: url(tab-right.gif) no-repeat 100% 0%;
    font-weight: bold;
-   color: #4a200e /* Panel Inlay Font Color */ !important;
+   color: #fff /* Panel Inlay Font Color */ !important;
    text-decoration: none;
-   padding: 5px 10px 4px 10px;
-   margin: 1px 0 0;
+   padding: 5px 10px 5px 10px;
 }
 ul.Tabs li a:hover {
-   background: #f3fcff /* Panel Inlay Background Color */;
+	 background-position-y: -42px;
 }
 ul.Tabs li.Active a {
    background: url(tab-right-selected.gif) no-repeat 100% 0%;
    color: #454545 /* Panel Selected Font Color */ !important;
    text-decoration: none;
-   padding: 5px 10px 4px 10px;
+   padding: 5px 10px 5px 10px;
 }
 ul.Tabs li a span {
    line-height: 1;

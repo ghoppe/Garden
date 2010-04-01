@@ -11,10 +11,15 @@ if ($this->_CategoryData !== FALSE) {
    <h4><?php echo T('Categories'); ?></h4>
    <ul class="PanelInfo">
       <li<?php
-      if (!is_numeric($CategoryID))
+      if (!is_numeric($CategoryID) && $this->_Sender->SelfUrl == "discussions" )
          echo ' class="Active"';
          
       ?>><strong><?php echo Anchor(Format::Text(T('All Discussions')), '/discussions'); ?></strong> <?php echo $CountDiscussions; ?></li>
+ <li<?php
+      if (!is_numeric($CategoryID) && $this->_Sender->SelfUrl == "categories")
+         echo ' class="Active"';
+         
+      ?>><strong><?php echo Anchor(Format::Text(T('All Categories')), '/categories'); ?></strong> <?php echo $CountDiscussions; ?></li>
       <?php
    foreach ($this->_CategoryData->Result() as $Category) {
       ?>
