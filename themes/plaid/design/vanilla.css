@@ -78,7 +78,8 @@ ul.PanelDiscussions li strong {
 ul.DataList li {
    margin: 0;
    padding: 0 0 4px 0;
-   border-bottom: 1px solid #dbe3e6;
+   border-bottom: 1px solid #600000;
+   background: url(sbg.gif) repeat #cc9966;
 }
 ul.DataList li li {
    border: 0;
@@ -252,6 +253,7 @@ body.Discussion #Content h2 span {
 #Discussion {
 }
 #Discussion .Comment {
+   background: url(sbg.gif) repeat #cc9966;
    border-bottom: 1px solid #ff9966;
 }
 /* Note: Fixes IE 7 Glitch */

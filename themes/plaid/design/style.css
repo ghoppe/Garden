@@ -182,7 +182,6 @@ select {
    cursor: pointer;
    margin: 0;
    font-family: 'lucida grande','Lucida Sans Unicode', Tahoma, sans-serif;
-   font-size: 8px;
    background: url('button-red.png') -5px -5px;
    color: #FFC800;
    border: none;
@@ -195,13 +194,21 @@ select {
 	-moz-box-shadow: 0px 0px 2px #999;
 	-webkit-box-shadow: 0px 0px 2px #999;  
    }
+   
+a.Button, a.Button:link, a.Button:visited {
+	 font-size: 12px;
+   color: #FFC800;
+   padding: 2px 8px 2px 8px;
+}  
+  
 input.Button {
 	font-size: 14px;
    font-weight: bold;
 }
-.Button:hover {
+.Button:hover, a.Button:active {
    color: #fff;
    background-position-y: -35px;
+   text-decoration: none;
 }
 .Button:focus {
    background: #eee;
@@ -429,11 +436,14 @@ body #Head h1 {
 }
 #Head h1 a span {
    font-size: 24px;
-   color:#E4F7FE;
-   text-shadow:0 1px 0 #30ACD6;   
+   color:#FFC800;
+   text-shadow:0 1px 0 #600000;   
+}
+#Head h1 a:hover {
+   text-decoration: none;
 }
 #Head h1 a:hover span {
-   color:#f3fcff;
+   color:#fff;
 }
 #Head form {
    float: right;
@@ -701,8 +711,9 @@ ul#Menu {
 #Menu a span,
 #Menu li.Active a span,
 #Menu li.Highlight a:hover span {
-   background: #f2fcff;
-   color: #299fc7;
+   background: #000;
+   color: #fff;
+   border: 1px solid #963;
 }
 
 
@@ -778,7 +789,7 @@ ul.PanelActivity li div.Story {
 	font-size: 85%;
 }
 ul.PanelInfo li {
-	 background: url(data0d.gif) repeat-x;
+	 background: url(parch-bevel-top.jpg) repeat-x;
    border-bottom: 1px solid #aa6633;
    padding: 2px 4px;
    font-family: 'lucida grande','Lucida Sans Unicode', tahoma, sans-serif;

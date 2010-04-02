@@ -64,14 +64,11 @@
 			</div>
 			<div id="Foot">
 				<?php $this->RenderAsset('Foot'); ?>
-				<div id="subnav"><a href="#">SubNav1</a> 
-					            | <a href="#">SubNav2</a> 
-									| <a href="#">SubNav3</a> 
-									| <a href="#">SubNav4</a> 
-									| <a href="#">SubNav5</a> 
-									| <a href="#">SubNav6</a>
+				<div id="subnav"><a href="http://wow.clanplaid.net/">Home</a> 
+					             | <a href="http://wow.clanplaid.net/v/index.php">Barrens Chat</a> 
+									     | <a href="http://wow.clanplaid.net/pages/about-us">About Us</a> 
 				<div class="credits">
-					<?php printf(Gdn::Translate('Discussion forum powered by %s'), '<a href="http://vanillaforums.org"><span>Vanilla</span></a>'); ?>
+					<?php printf(Gdn::Translate('Barrens Chat is powered by %s'), '<a href="http://vanillaforums.org"><span>Vanilla</span></a>'); ?>
 				</div>
 				</div>									
 				<div>
