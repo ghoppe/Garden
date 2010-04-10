@@ -230,7 +230,7 @@ body.Discussion #Content h2 {
    font-weight:bold;
    margin: 0;
    color: #333;
-   padding: 6px 0;
+   padding: 9px 0;
    line-height: 1.2;
 }
 body.Discussion #Content h2 span {
@@ -254,7 +254,7 @@ body.Discussion #Content h2 span {
 }
 #Discussion .Comment {
    background: url(sbg.gif) repeat #cc9966;
-   border-bottom: 1px solid #ff9966;
+   border-bottom: 2px groove #CC9966;
 }
 /* Note: Fixes IE 7 Glitch */
 *:first-child+html #Discussion .Comment {

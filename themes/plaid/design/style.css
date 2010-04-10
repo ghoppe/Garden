@@ -66,7 +66,7 @@ body {
 	height: 100%;
 }
 
-#header { height:196px; background:url(cp_header.png) right no-repeat; padding:0px 20px;}
+#header { height:92px; background:url(cp_header.png) right no-repeat; padding:0px 20px;}
 
 #Frame {
 	background: url(border_b_1.gif) repeat-x; 
@@ -279,9 +279,9 @@ div.Errors ul li {
 /* Note: Warning, Alert & Info are simple boxes that can be used to wrap message
    strings & imply importance. */
 .Warning {
-   background: #ffc;
-   border: 1px solid #ff9;
-   color: #000;
+   background: #ff9;
+   border: 1px solid #963;
+   color: #333;
    padding: 6px 8px;
    -moz-border-radius: 3px;
    -webkit-border-radius: 3px;
@@ -335,15 +335,17 @@ div.DismissMessage a.Dismiss:hover {
 }
 /* Note: The close class is used on the "close" anchor in popups. */
 a.Close {
-	color:#777;
+	color:#900;
 	font-family:arial;
 	font-size:20px;
 	font-weight:bold;
 	cursor:pointer;
 	padding: 0 2px;
+    text-shadow:1px 1px 2px #963;   
 }
 a.Close:hover {
-	color: #333;
+	color: #300;
+	text-decoration: none;
 }
 /* Note: MorePager is related to the /applications/garden/modules/MorePagerModule. */
 .MorePager {
@@ -436,7 +438,7 @@ body #Head h1 {
 }
 #Head h1 a span {
    font-size: 24px;
-   color:#FFC800;
+   color:#FC0;
    text-shadow:0 1px 0 #600000;   
 }
 #Head h1 a:hover {
@@ -789,7 +791,7 @@ ul.PanelActivity li div.Story {
 	font-size: 85%;
 }
 ul.PanelInfo li {
-	 background: url(parch-bevel-top.jpg) repeat-x;
+   background: url(parch-bevel-top.jpg) repeat-x;
    border-bottom: 1px solid #aa6633;
    padding: 2px 4px;
    font-family: 'lucida grande','Lucida Sans Unicode', tahoma, sans-serif;
@@ -970,9 +972,9 @@ ul.Activities {
 	margin-bottom: 6px;
 }
 ul.Activities li {
-   border-bottom: 1px solid #333;
-   padding: 8px 0 6px;
-   color: #454545;
+   border-bottom: 1px solid #600000;
+   padding: 3px 0 3px;
+   color: #630;
    clear: left;
 }
 ul.Activities div span {
@@ -986,6 +988,9 @@ ul.Activities li img {
    border: 0;
    height: 40px;
    width: 40px;
+	 box-shadow: 0px 0px 3px #963;
+	-moz-box-shadow: 0px 0px 3px #963;
+	-webkit-box-shadow: 0px 0px 3px #963;  
 }
 ul.Activities li.ActivityComment img {
    height: 32px;
@@ -1034,7 +1039,7 @@ ul.Activities li div.Story {
    -moz-border-radius: 2px;
    -webkit-border-radius: 2px;
    background: url(sbg.gif) repeat #cc9966;
-   margin: 4px 0;
+   margin: 3px 0;
    padding: 4px 6px;
    line-height: 130%;
    display: block;
@@ -1065,17 +1070,14 @@ ul.Activities li div.Story img {
    margin: 0 4px 0 0;
 }
 ul.Activities ul.Comments {
-   background: #fff;
    margin: 0 0 0 46px;
-   padding: 1px 0 0;
    list-style: none;
    font-size: 85%;
    clear: left;
 }
 ul.Activities ul.Comments li {
-   background: #e9f9ff /* Panel Background Color */;
-   margin-bottom: 1px;
-   border-bottom: 0;
+   background: url(sbg.gif) repeat #cc9966;
+   border-bottom: 2px groove #CC9966;
    padding: 6px;
    line-height: 1;
 }
@@ -1129,11 +1131,11 @@ ul.Activities ul.Comments li.CommentForm {
 ul.Activities ul.Comments li.CommentForm a.CommentLink,
 ul.Activities ul.Comments li.CommentForm a.CommentLink:hover {
    cursor: text;
-   background: #fff;
-   color: #bbb !important;
+   background: url(item-input-box.gif) repeat-x #f2e0a2;
+   color: #C96 !important;
    padding: 5px;
    text-decoration: none;
-   border: 1px solid #aaa;
+   border: 1px solid #C96;
    display: block;
    line-height: 100%;
    font-weight: normal;
@@ -1274,26 +1276,29 @@ div.User a {
    text-decoration: none;
 }
 div.User h1 {
-   padding: 0 0 8px;
+   padding: 0 5px 9px;
    margin: 0;
    line-height: 100%;
    border: 0;
+   font-size: 175%;
 }
 #Status {
-   -moz-border-radius-topleft: 2px;
-   -moz-border-radius-topright: 2px;
-   -webkit-border-top-left-radius: 2px;
-   -webkit-border-top-right-radius: 2px;
-   background: #e9f9ff;
-   margin: 0;
-   padding: 8px 8px 0;
-   color: #999;
+   -moz-border-radius: 7px;
+   -webkit-border-radius: 7px;
+    background: url(sbg.gif) repeat #cc9966;
+   margin-bottom: 9px;
+   padding: 8px;
+   color: #333;
    font-weight: normal;
    line-height: 100%;
+   box-shadow: 0px 0px 5px #963;
+   -moz-box-shadow: 0px 0px 5px #963;
+   -webkit-box-shadow: 0px 0px 5px #963;  
+   border: 2px solid #996633;
 }
 #Status p {
    font-size: 120%;
-   color: #6c6c6c;
+   color: #333;
    display: inline;
    margin: 0;
    padding: 0;
@@ -1323,6 +1328,9 @@ form.Activity {
    display: block;
    background: url(sbg.gif) repeat #cc9966;
    padding: 10px;
+   box-shadow: 0px 0px 5px #963;
+   -moz-box-shadow: 0px 0px 5px #963;
+   -webkit-box-shadow: 0px 0px 5px #963;  
 }
 form.Activity textarea {
    width: 660px;
@@ -1551,11 +1559,11 @@ div.Popup div.Body {
   text-align: left;
   position: relative;
   padding: 0px;
-  background: #fff;
+   background: url(sbg.gif) repeat #cc9966;
   max-width: 500px;
   -moz-border-radius: 5px;
   -webkit-border-radius: 5px;
-  border: 8px solid #555;
+  border: 8px solid #300;
 	box-shadow: 0px 0px 10px #333;
 	-moz-box-shadow: 0px 0px 10px #333;
 	-webkit-box-shadow: 0px 0px 10px #333;  
@@ -1577,17 +1585,17 @@ div.Popup h2 {
 	font-size:120%;
 	font-weight:bold;
 	margin-bottom: 0;
-	color: #fff;
-	background: #44C7F4;
-	border-bottom: 1px solid #3DB9E5;
-	text-shadow: none;
+	color: #FC0;
+	background: url(tartan_bg.png) repeat;
+	border-bottom: 2px groove #996633;
+	text-shadow: 1px 1px 2px #000;
 	padding: 6px 9px 4px;
 }
 div.Popup .Footer {
-  background: #E9F9FF;
+  background: url(parch-bevel-top.jpg) repeat-x;
   text-align: right;
   padding: 2px 6px 0 0;
-  border-top:1px solid #CAF0FE;
+  border-top:1px solid #960;
   -moz-border-radius-bottomleft: 5px;
   -moz-border-radius-bottomright: 5px;
   -webkit-border-bottom-left-radius: 5px;

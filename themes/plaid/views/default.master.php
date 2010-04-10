@@ -58,9 +58,6 @@
 					<div id="Content"><?php $this->RenderAsset('Content'); ?></div>
 					<div id="Panel"><?php $this->RenderAsset('Panel'); ?></div>
 				</div>
-				<div id="sidebar">
-					<%= render :partial => "/shared/header" %>
-				</div>
 			</div>
 			<div id="Foot">
 				<?php $this->RenderAsset('Foot'); ?>
