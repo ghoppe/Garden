@@ -41,6 +41,7 @@ class Gdn_Email extends Gdn_Pluggable {
       $this->PhpMailer = new PHPMailer();
       $this->PhpMailer->CharSet = Gdn::Config('Garden.Charset', 'utf-8');
       $this->PhpMailer->SingleTo = Gdn::Config('Garden.Email.SingleTo', FALSE);
+      $this->PhpMailer->PluginDir = PATH_LIBRARY.DS.'vendors'.DS.'phpmailer'.DS;
       $this->Clear();
       parent::__construct();
    }
@@ -55,7 +56,9 @@ class Gdn_Email extends Gdn_Pluggable {
     * @return Email
     */
    public function Bcc($RecipientEmail, $RecipientName = '') {
+      ob_start();
       $this->PhpMailer->AddBCC($RecipientEmail, $RecipientName);
+      ob_end_clean();
       return $this;
    }
    
@@ -68,7 +71,9 @@ class Gdn_Email extends Gdn_Pluggable {
     * @return Email
     */
    public function Cc($RecipientEmail, $RecipientName = '') {
+      ob_start();
       $this->PhpMailer->AddCC($RecipientEmail, $RecipientName);
+      ob_end_clean();
       return $this;
    }
 
@@ -105,9 +110,10 @@ class Gdn_Email extends Gdn_Pluggable {
          $SenderName = Gdn::Config('Garden.Email.SupportName', '');
       
       if($this->PhpMailer->Sender == '' || $bOverrideSender) $this->PhpMailer->Sender = $SenderEmail;
-         
+      
+      ob_start();
       $this->PhpMailer->SetFrom($SenderEmail, $SenderName, FALSE);
-
+      ob_end_clean();
       return $this;
    }
 
@@ -131,10 +137,14 @@ class Gdn_Email extends Gdn_Pluggable {
     * @return Email
     */
    public function Message($Message) {
+   
+      // htmlspecialchars_decode is being used here to revert any specialchar escaping done by Gdn_Format::Text()
+      // which, untreated, would result in &#039; in the message in place of single quotes.
+   
       if ($this->PhpMailer->ContentType == 'text/html') {
-         $this->PhpMailer->MsgHTML($Message);
+         $this->PhpMailer->MsgHTML(htmlspecialchars_decode($Message,ENT_QUOTES));
       } else {
-         $this->PhpMailer->Body = $Message;
+         $this->PhpMailer->Body = htmlspecialchars_decode($Message,ENT_QUOTES);
       }
       return $this;
    }
@@ -167,6 +177,7 @@ class Gdn_Email extends Gdn_Pluggable {
 
          $this->PhpMailer->Host = $SmtpHost;
          $this->PhpMailer->Port = $SmtpPort;
+         $this->PhpMailer->SMTPSecure = Gdn::Config('Garden.Email.SmtpSecurity', '');
          $this->PhpMailer->Username = $Username = Gdn::Config('Garden.Email.SmtpUser', '');
          $this->PhpMailer->Password = $Password = Gdn::Config('Garden.Email.SmtpPassword', '');
          if(!empty($Username))
@@ -185,7 +196,7 @@ class Gdn_Email extends Gdn_Pluggable {
       if (!$this->PhpMailer->Send()) {
          throw new Exception($this->PhpMailer->ErrorInfo);
       }
-
+      
       return true;
    }
    
@@ -201,7 +212,9 @@ class Gdn_Email extends Gdn_Pluggable {
 
    
    public function AddTo($RecipientEmail, $RecipientName = ''){
+      ob_start();
       $this->PhpMailer->AddAddress($RecipientEmail, $RecipientName);
+      ob_end_clean();
       return $this;
    }
    
@@ -213,7 +226,7 @@ class Gdn_Email extends Gdn_Pluggable {
     * an array of email addresses, this value will be ignored.
     */
    public function To($RecipientEmail, $RecipientName = '') {
-   
+
       if (is_string($RecipientEmail)) {
          if (strpos($RecipientEmail, ',') > 0) {
             $RecipientEmail = explode(',', $RecipientEmail);
@@ -229,8 +242,8 @@ class Gdn_Email extends Gdn_Pluggable {
          return $this;
          
       } elseif ($RecipientEmail instanceof stdClass) {
-         $RecipientName = ObjectValue('Name', $RecipientEmail);
-         $RecipientEmail = ObjectValue('Email', $RecipientEmail);
+         $RecipientName = GetValue('Name', $RecipientEmail);
+         $RecipientEmail = GetValue('Email', $RecipientEmail);
          return $this->To($RecipientEmail, $RecipientName);
       
       } elseif ($RecipientEmail instanceof Gdn_DataSet) {
@@ -243,7 +256,7 @@ class Gdn_Email extends Gdn_Pluggable {
          if ($Count == count($RecipientName)) {
             $RecipientEmail = array_combine($RecipientEmail, $RecipientName);
             foreach($RecipientEmail as $Email => $Name) $this->To($Email, $Name);
-         }else
+         } else
             trigger_error(ErrorMessage('Size of arrays do not match', 'Email', 'To'), E_USER_ERROR);
          
          return $this;

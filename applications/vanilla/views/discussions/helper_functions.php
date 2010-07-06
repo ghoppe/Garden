@@ -6,26 +6,44 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
    $CssClass .= $Alt.' ';
    $CssClass .= $Discussion->Announce == '1' ? ' Announcement' : '';
    $CssClass .= $Discussion->InsertUserID == $Session->UserID ? ' Mine' : '';
-   $CountUnreadComments = $Discussion->CountComments - $Discussion->CountCommentWatch;
+   $CountUnreadComments = $Discussion->CountUnreadComments;
+   // Logic for incomplete comment count.
+   if($Discussion->CountCommentWatch == 0 && $DateLastViewed = GetValue('DateLastViewed', $Discussion)) {
+      if(Gdn_Format::ToTimestamp($DateLastViewed) >= Gdn_Format::ToTimestamp($Discussion->LastDate)) {
+         $CountUnreadComments = 0;
+         $Discussion->CountCommentWatch = $Discussion->CountComments;
+      } else {
+         $CountUnreadComments = '';
+      }
+   }
    $CssClass .= ($CountUnreadComments > 0 && $Session->IsValid()) ? ' New' : '';
    $Sender->EventArguments['Discussion'] = &$Discussion;
+   $First = UserBuilder($Discussion, 'First');
    $Last = UserBuilder($Discussion, 'Last');
 ?>
 <li class="<?php echo $CssClass; ?>">
    <?php WriteOptions($Discussion, $Sender, $Session); ?>
    <div class="ItemContent Discussion">
-      <?php echo Anchor(Format::Text($Discussion->Name), '/discussion/'.$Discussion->DiscussionID.'/'.Format::Url($Discussion->Name).($Discussion->CountCommentWatch > 0 ? '/#Item_'.$Discussion->CountCommentWatch : ''), 'Title'); ?>
+      <?php echo Anchor(Gdn_Format::Text($Discussion->Name), '/discussion/'.$Discussion->DiscussionID.'/'.Gdn_Format::Url($Discussion->Name).($Discussion->CountCommentWatch > 0 ? '/#Item_'.$Discussion->CountCommentWatch : ''), 'Title'); ?>
       <?php $Sender->FireEvent('AfterDiscussionTitle'); ?>
       <div class="Meta">
          <?php if ($Discussion->Announce == '1') { ?>
          <span class="Announcement"><?php echo T('Announcement'); ?></span>
          <?php } ?>
+         <?php if ($Discussion->Closed == '1') { ?>
+         <span class="Closed"><?php echo T('Closed'); ?></span>
+         <?php } ?>
          <span><?php printf(Plural($Discussion->CountComments, '%s comment', '%s comments'), $Discussion->CountComments); ?></span>
          <?php
-            if ($CountUnreadComments > 0 && $Session->IsValid())
-               echo '<strong>',sprintf(T('%s new'), $CountUnreadComments),'</strong>';
+            if ($CountUnreadComments > 0 || $CountUnreadComments === '' && $Session->IsValid())
+               echo '<strong>',trim(sprintf(T('%s new'), $CountUnreadComments)),'</strong>';
          ?>
-         <span><?php printf(T('Most recent by %1$s %2$s'), UserAnchor($Last), Format::Date($Discussion->LastDate)); ?></span>
+         <span><?php
+            if ($Discussion->LastCommentID != '')
+               printf(T('Most recent by %1$s %2$s'), UserAnchor($Last), Gdn_Format::Date($Discussion->LastDate));
+            else
+               printf(T('Started by %1$s %2$s'), UserAnchor($First), Gdn_Format::Date($Discussion->FirstDate));
+         ?></span>
          <span><?php echo Anchor($Discussion->Category, '/categories/'.$Discussion->CategoryUrlCode, 'Category'); ?></span>
          <?php $Sender->FireEvent('DiscussionMeta'); ?>
       </div>
@@ -96,7 +114,7 @@ function WriteOptions($Discussion, &$Sender, &$Session) {
       $Title = T($Discussion->Bookmarked == '1' ? 'Unbookmark' : 'Bookmark');
       echo Anchor(
          '<span class="Star">'
-            .Img('applications/garden/design/images/pixel.png', array('alt' => $Title))
+            .Img('applications/dashboard/design/images/pixel.png', array('alt' => $Title))
          .'</span>',
          '/vanilla/discussion/bookmark/'.$Discussion->DiscussionID.'/'.$Session->TransientKey().'?Target='.urlencode($Sender->SelfUrl),
          'Bookmark' . ($Discussion->Bookmarked == '1' ? ' Bookmarked' : ''),
@@ -110,23 +128,23 @@ function WriteOptions($Discussion, &$Sender, &$Session) {
          $Sender->Options .= '<li>'.Anchor(T('Dismiss'), 'vanilla/discussion/dismissannouncement/'.$Discussion->DiscussionID.'/'.$Session->TransientKey(), 'DismissAnnouncement') . '</li>';
       
       // Edit discussion
-      if ($Discussion->FirstUserID == $Session->UserID || $Session->CheckPermission('Vanilla.Discussions.Edit', $Discussion->CategoryID))
+      if ($Discussion->FirstUserID == $Session->UserID || $Session->CheckPermission('Vanilla.Discussions.Edit', TRUE, 'Category', $Discussion->CategoryID))
          $Sender->Options .= '<li>'.Anchor(T('Edit'), 'vanilla/post/editdiscussion/'.$Discussion->DiscussionID, 'EditDiscussion') . '</li>';
 
       // Announce discussion
-      if ($Session->CheckPermission('Vanilla.Discussions.Announce', $Discussion->CategoryID))
+      if ($Session->CheckPermission('Vanilla.Discussions.Announce', TRUE, 'Category', $Discussion->CategoryID))
          $Sender->Options .= '<li>'.Anchor(T($Discussion->Announce == '1' ? 'Unannounce' : 'Announce'), 'vanilla/discussion/announce/'.$Discussion->DiscussionID.'/'.$Session->TransientKey(), 'AnnounceDiscussion') . '</li>';
 
       // Sink discussion
-      if ($Session->CheckPermission('Vanilla.Discussions.Sink', $Discussion->CategoryID))
+      if ($Session->CheckPermission('Vanilla.Discussions.Sink', TRUE, 'Category', $Discussion->CategoryID))
          $Sender->Options .= '<li>'.Anchor(T($Discussion->Sink == '1' ? 'Unsink' : 'Sink'), 'vanilla/discussion/sink/'.$Discussion->DiscussionID.'/'.$Session->TransientKey().'?Target='.urlencode($Sender->SelfUrl), 'SinkDiscussion') . '</li>';
 
       // Close discussion
-      if ($Session->CheckPermission('Vanilla.Discussions.Close', $Discussion->CategoryID))
+      if ($Session->CheckPermission('Vanilla.Discussions.Close', TRUE, 'Category', $Discussion->CategoryID))
          $Sender->Options .= '<li>'.Anchor(T($Discussion->Closed == '1' ? 'Reopen' : 'Close'), 'vanilla/discussion/close/'.$Discussion->DiscussionID.'/'.$Session->TransientKey().'?Target='.urlencode($Sender->SelfUrl), 'CloseDiscussion') . '</li>';
       
       // Delete discussion
-      if ($Session->CheckPermission('Vanilla.Discussions.Delete', $Discussion->CategoryID))
+      if ($Session->CheckPermission('Vanilla.Discussions.Delete', TRUE, 'Category', $Discussion->CategoryID))
          $Sender->Options .= '<li>'.Anchor(T('Delete'), 'vanilla/discussion/delete/'.$Discussion->DiscussionID.'/'.$Session->TransientKey().'?Target='.urlencode($Sender->SelfUrl), 'DeleteDiscussion') . '</li>';
       
       // Allow plugins to add options

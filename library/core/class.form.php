@@ -109,7 +109,7 @@ class Gdn_Form {
          $EndYear = date('Y');
       }
 
-      $Months = array_map('Translate',
+      $Months = array_map('T',
          explode(',', 'Month,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec'));
 
       $Days = array();
@@ -191,9 +191,13 @@ class Gdn_Form {
       $Return = '';
       // If the form hasn't been posted back, use the provided $ValueDataSet
       if ($this->IsPostBack() === FALSE) {
-         $CheckedValues = $ValueDataSet;
-         if (is_object($ValueDataSet)) $CheckedValues = ConsolidateArrayValuesByKey(
-            $ValueDataSet->ResultArray(), $FieldName);
+         if ($ValueDataSet === NULL) {
+            $CheckedValues = $this->GetValue($FieldName);
+         } else {
+            $CheckedValues = $ValueDataSet;
+            if (is_object($ValueDataSet))
+               $CheckedValues = ConsolidateArrayValuesByKey($ValueDataSet->ResultArray(), $FieldName);
+         }
       } else {
          $CheckedValues = $this->GetFormValue($FieldName, array());
       }
@@ -761,7 +765,8 @@ class Gdn_Form {
       // Action
       $ActionFromAttributes = ArrayValueI('action', $Attributes);
       if ($this->Action == '')
-         $this->Action = Url(Gdn_Url::Request());
+         $this->Action = Url();
+         
       $this->Action = $ActionFromAttributes === FALSE ? $this->Action : $ActionFromAttributes;
       
       $Return .= ' method="' . $this->Method . '"'
@@ -935,10 +940,26 @@ class Gdn_Form {
     * specified FieldName. Errors added with this method can be rendered with
     * $this->Errors().
     *
-    * @param string $ErrorCode The translation code that represents the error to display.
+    * @param mixed $ErrorCode
+    *  - <b>string</b>: The translation code that represents the error to display.
+    *  - <b>Exception</b>: The exception to display the message for.
     * @param string $FieldName The name of the field to relate the error to.
     */
-   public function AddError($ErrorCode, $FieldName = '') {
+   public function AddError($Error, $FieldName = '') {
+      if(is_string($Error))
+         $ErrorCode = $Error;
+      elseif(is_a($Error, 'Exception')) {
+         if(defined('DEBUG')) {
+            $ErrorCode = '@<pre>'.
+               $Error->getMessage()."\n".
+               $Error->getFile().' Line '.$Error->getLine()."\n".
+               $Error->getTraceAsString().
+               '</pre>';
+         } else {
+            $ErrorCode = '@'.strip_tags($Error->getMessage());
+         }
+      }
+      
       if ($FieldName == '') $FieldName = '<General Error>';
 
       if (!is_array($this->_ValidationResults)) $this->_ValidationResults = array();
@@ -1076,7 +1097,7 @@ class Gdn_Form {
       $ID = $FieldName;
       if (substr($ID, -2) == '[]') $ID = substr($ID, 0, -2);
 
-      $ID = $this->IDPrefix . Format::AlphaNumeric(str_replace('.', '-dot-', $ID));
+      $ID = $this->IDPrefix . Gdn_Format::AlphaNumeric(str_replace('.', '-dot-', $ID));
       $tmp = $ID;
       $i = 1;
       if ($ForceUniqueID === TRUE) {
@@ -1134,10 +1155,8 @@ class Gdn_Form {
       // Only retrieve values from the form collection if this is a postback.
       if ($this->IsPostBack()) {
          $Return = $this->GetFormValue($FieldName, $Default);
-      } else if (is_array($this->_DataArray) && array_key_exists($FieldName, $this->_DataArray)) {
-         $Return = $this->_DataArray[$FieldName];
       } else {
-         $Return = $Default;
+         $Return = ArrayValue($FieldName, $this->_DataArray, $Default);
       }
       return $Return;
    }
@@ -1166,7 +1185,7 @@ class Gdn_Form {
       2009-01-10 - $_GET should not dictate a "post" back.
       return count($_POST) > 0 ? TRUE : FALSE;
       
-      2009-03-31 - switching back to "get" dicating a postback
+      2009-03-31 - switching back to "get" dictating a postback
       */
       $FormCollection = $this->Method == 'get' ? $_GET : $_POST;
       return count($FormCollection) > 0 || (is_array($this->_FormValues) && count($this->_FormValues) > 0) ? TRUE : FALSE;
@@ -1263,7 +1282,6 @@ class Gdn_Form {
    public function ValidateModel() {
       $this->_Model->DefineSchema();
       if ($this->_Model->Validation->Validate($this->FormValues()) === FALSE) $this->_ValidationResults = $this->_Model->ValidationResults();
-
       return $this->ErrorCount();
    }
 
@@ -1283,7 +1301,7 @@ class Gdn_Form {
                
          } else {
             // Otherwise assume it is an object representation of a data row.
-            $this->_DataArray = Format::ObjectAsArray($Data);
+            $this->_DataArray = Gdn_Format::ObjectAsArray($Data);
          }
       } else if (is_array($Data)) {
          $this->_DataArray = $Data;
@@ -1349,8 +1367,13 @@ class Gdn_Form {
     *
     * @return array
     */
-   public function FormValues() {
-      if (is_array($this->_FormValues) === FALSE) {
+   public function FormValues($NewValue = NULL) {
+      if($NewValue !== NULL) {
+         $this->_FormValues = $NewValue;
+         return;
+      }
+
+      if (!is_array($this->_FormValues)) {
          $TableName = $this->InputPrefix;
          if(strlen($TableName) > 0)
             $TableName .= '/';
@@ -1558,6 +1581,6 @@ class Gdn_Form {
     */
    protected function _ValueAttribute($FieldName, $Attributes) {
       // Value from $Attributes overrides the datasource and the postback.
-      return ' value="' . Format::Form(ArrayValueI('value', $Attributes, $this->GetValue($FieldName))) . '"';
+      return ' value="' . Gdn_Format::Form(ArrayValueI('value', $Attributes, $this->GetValue($FieldName))) . '"';
    }
 }

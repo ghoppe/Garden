@@ -24,7 +24,7 @@ class Gdn_PluginManager {
    
    /**
     * An associative array of arrays containing information about each
-    * enabled plugin. This value is assigned in the garden bootstrap.php.
+    * enabled plugin. This value is assigned in the bootstrap.php.
     */
    public $EnabledPlugins = array();
 
@@ -79,6 +79,21 @@ class Gdn_PluginManager {
                $MethodName = strtolower($Method);
                // Loop through their individual methods looking for event handlers and method overrides.
                if (isset($MethodName[9])) {
+                  $Suffix = array_pop(explode('_',$MethodName));
+                  switch ($Suffix) {
+                     case 'handler':
+                     case 'before':
+                     case 'after':
+                        $this->RegisterHandler($ClassName, $MethodName);
+                     break;
+                     case 'override':
+                        $this->RegisterOverride($ClassName, $MethodName);
+                     break;
+                     case 'create':
+                        $this->RegisterNewMethod($ClassName, $MethodName);
+                     break;
+                  }
+/*
                   if (substr($MethodName, -8) == '_handler' || substr($MethodName, -7) == '_before' || substr($MethodName, -6) == '_after') {
                      $this->RegisterHandler($ClassName, $MethodName);
                   } else if (substr($MethodName, -9) == '_override') {
@@ -86,6 +101,7 @@ class Gdn_PluginManager {
                   } else if (substr($MethodName, -7) == '_create') {
                      $this->RegisterNewMethod($ClassName, $MethodName);
                   }
+*/
                }
             }
          }
@@ -264,7 +280,7 @@ class Gdn_PluginManager {
       if (property_exists($this, $NewMethodClassName) === FALSE)
          $this->$NewMethodClassName = new $NewMethodClassName($Sender);
          
-      return $this->$NewMethodClassName->$NewMethodName($Sender, $Sender->RequestArgs);
+      return $this->$NewMethodClassName->$NewMethodName($Sender, GetValue('RequestArgs', $Sender, array()));
    }
    
    /**
@@ -361,8 +377,11 @@ class Gdn_PluginManager {
       return array_values($EnabledPlugins);
    }
    
-   public function EnablePlugin($PluginName, $Validation, $Setup = FALSE) {
-      // 1. Make sure that the plugin's requirements are met
+   /**
+    * Test to see if a plugin throws fatal errors.
+    */
+   public function TestPlugin($PluginName, &$Validation, $Setup = FALSE) {
+      // Make sure that the plugin's requirements are met
       // Required Plugins
       $AvailablePlugins = $this->AvailablePlugins();
       $RequiredPlugins = ArrayValue('RequiredPlugins', ArrayValue($PluginName, $AvailablePlugins, array()), FALSE);
@@ -370,7 +389,7 @@ class Gdn_PluginManager {
       
       // Required Themes
       $ThemeManager = new Gdn_ThemeManager();
-      $EnabledThemes = $ThemeManager->EnabledThemeInfo();
+      $EnabledThemes = $ThemeManager->EnabledThemeInfo(TRUE);
       $RequiredThemes = ArrayValue('RequiredTheme', ArrayValue($PluginName, $AvailablePlugins, array()), FALSE);
       CheckRequirements($PluginName, $RequiredThemes, $EnabledThemes, 'theme');
       
@@ -380,27 +399,36 @@ class Gdn_PluginManager {
       $RequiredApplications = ArrayValue('RequiredApplications', ArrayValue($PluginName, $AvailablePlugins, array()), FALSE);
       CheckRequirements($PluginName, $RequiredApplications, $EnabledApplications, 'application');
 
-      // 2. Include the plugin, instantiate it, and call its setup method
+      // Include the plugin, instantiate it, and call its setup method
       $PluginInfo = ArrayValue($PluginName, $AvailablePlugins, FALSE);
+      $PluginClassName = ArrayValue('ClassName', $PluginInfo, FALSE);
       $PluginFolder = ArrayValue('Folder', $PluginInfo, FALSE);
       if ($PluginFolder == '')
          throw new Exception(T('The plugin folder was not properly defined.'));
-      
+
       $this->_PluginHook($PluginName, self::ACTION_ENABLE, $Setup);
-      
-      // 3. If setup succeeded, register any specified permissions
+
+      // If setup succeeded, register any specified permissions
       $PermissionName = ArrayValue('RegisterPermissions', $PluginInfo, FALSE);
       if ($PermissionName != FALSE) {
          $PermissionModel = Gdn::PermissionModel();
          $PermissionModel->Define($PermissionName);
       }
 
+      return TRUE;
+   }
+
+   public function EnablePlugin($PluginName, $Validation, $Setup = FALSE) {
+      $this->TestPlugin($PluginName, $Validation, $Setup);
+      
       if (is_object($Validation) && count($Validation->Results()) > 0)
          return FALSE;
 
-      // 4. If everything succeeded, add the plugin to the
+      // If everything succeeded, add the plugin to the
       // $EnabledPlugins array in conf/plugins.php
       // $EnabledPlugins['PluginClassName'] = 'Plugin Folder Name';
+      $PluginInfo = ArrayValue($PluginName, $this->AvailablePlugins(), FALSE);
+      $PluginFolder = ArrayValue('Folder', $PluginInfo);
       SaveToConfig('EnabledPlugins'.'.'.$PluginName, $PluginFolder);
       
       $ApplicationManager = new Gdn_ApplicationManager();
@@ -432,7 +460,7 @@ class Gdn_PluginManager {
       $Locale->Set($Locale->Current(), $ApplicationManager->EnabledApplicationFolders(), $this->EnabledPluginFolders(), TRUE);
    }
    
-   /**
+    /**
     * Remove the plugin.
     *
     * @param string $PluginName 
@@ -484,14 +512,14 @@ class Gdn_PluginManager {
       $Paths = (array)$Paths;
       foreach($Paths as $Path) {
          if(file_exists($Path))
-            include($Path);
+            include_once($Path);
       }
       
       return $PluginInfo;
    }
    
    /**
-    * Hooks to the varies actions, i.e. enable, disable and remove.
+    * Hooks to the various actions, i.e. enable, disable and remove.
     *
     * @param string $PluginName 
     * @param string $ForAction which action to hook it to, i.e. enable, disable or remove
@@ -504,6 +532,7 @@ class Gdn_PluginManager {
          case self::ACTION_ENABLE:  $HookMethod = 'Setup'; break;
          case self::ACTION_DISABLE: $HookMethod = 'OnDisable'; break;
          case self::ACTION_REMOVE:  $HookMethod = 'CleanUp'; break;
+         case self::ACTION_ONLOAD:  $HookMethod = 'OnLoad'; break;
       }
       
       $PluginInfo      = ArrayValue($PluginName, $this->AvailablePlugins(), FALSE);

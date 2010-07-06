@@ -18,13 +18,19 @@ class Gdn {
    const AliasDispatcher = 'Dispatcher';
    const AliasLocale = 'Locale';
    const AliasPermissionModel = 'PermissionModel';
+   const AliasRequest = 'Request';
+   const AliasRouter = 'Router';
    const AliasSession = 'Session';
    const AliasSqlDriver = 'SqlDriver';
    const AliasUserModel = 'UserModel';
+   const AliasSlice = 'Slice';
+
+   const AliasPluginManager = 'PluginManager';
 
    const FactoryInstance = 'Instance';
    const FactoryPrototype = 'Prototype';
    const FactorySingleton = 'Singleton';
+   const FactoryRealSingleton = 'RealSingleton';
    
    /// PROPERTIES ///
    
@@ -41,7 +47,8 @@ class Gdn {
    protected static $_Session = NULL;
    
    /// METHODS ///
-   
+
+   /** @return Gdn_Auth */
    public static function Authenticator() {
       $Result = self::Factory(self::AliasAuthenticator);
       return $Result;
@@ -84,16 +91,13 @@ class Gdn {
     * @see Gdn_Factory::Factory()
     */
    public static function Factory($Alias = FALSE) {
-      if($Alias === FALSE) {
+      if ($Alias === FALSE)
          return self::$_Factory;
-      }
       
       // Get the arguments to pass to the factory.
       $Args = func_get_args();
       array_shift($Args);
-      
-      $Result = self::$_Factory->Factory($Alias, $Args);
-      return $Result;
+      return self::$_Factory->Factory($Alias, $Args);
    }
    
    /**
@@ -251,12 +255,38 @@ class Gdn {
    }
    
    /**
-    * Geth the permission model for the application.
+    * Get the permission model for the application.
     *
-    * @return Gdn_PermissionModel
+    * @return PermissionModel
     */
    public static function PermissionModel() {
       return self::Factory(self::AliasPermissionModel);
+   }
+   
+   /**
+    * Get or set the current request object.
+    * @param Gdn_Rewuest $NewRequest The new request or null to just get the request.
+    * @return Gdn_Request
+    */
+   public static function Request($NewRequest = NULL) {
+      $Request = self::Factory(self::AliasRequest);
+      if (!is_null($NewRequest)) {
+			if(is_string($NewRequest))
+				$Request->WithURI($NewRequest);
+			elseif(is_object($NewRequest))
+				$Request->FromImport($NewRequest);
+		}
+      
+      return $Request;
+   }
+   
+   /**
+    * Get the router object
+    *
+    * @return Gdn_Router
+    */
+   public static function Router() {
+      return self::Factory(self::AliasRouter);
    }
    
    /**
@@ -268,6 +298,11 @@ class Gdn {
       if(is_null(self::$_Session))
          self::$_Session = self::Factory(self::AliasSession);
       return self::$_Session;
+   }
+   
+   public static function Slice($Slice) {
+      $Result = self::Factory(self::AliasSlice);
+      return $Result->Execute($Slice);
    }
    
    /**
@@ -309,11 +344,10 @@ class Gdn {
    /**
     * Get a reference to the user model.
     * 
-    * @return Gdn_User
+    * @return UserModel
     */
    public static function UserModel() {
-      $Result = self::Factory(self::AliasUserModel);
-      return $Result;
+      return self::Factory(self::AliasUserModel);
    }
    
    /**
@@ -323,7 +357,7 @@ class Gdn {
     * @param boolean $Override whether to override the property if it is already set.
     */
    public static function SetFactory($Factory, $Override = TRUE) {
-      if($Override || is_null(self::$_Factory))
+      if ($Override || is_null(self::$_Factory))
          self::$_Factory = $Factory;
    }
 }

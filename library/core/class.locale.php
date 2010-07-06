@@ -21,11 +21,6 @@ Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
  * @namespace Garden.Core
  */
 
-
-if (!defined('APPLICATION'))
-   exit();
-
-
 /**
  * The Locale class is used to load, define, change, and render translations
  * for different locales. It is a singleton class.
@@ -64,13 +59,27 @@ class Gdn_Locale extends Gdn_Pluggable {
       parent::__construct();
    }
 
+   public function Refresh() {
+      $LocalName = $this->Current();
+
+      $ApplicationManager = Gdn::Factory('ApplicationManager');
+      $ApplicationWhiteList = $ApplicationManager->EnabledApplicationFolders();
+
+      $PluginManager = Gdn::Factory('PluginManager');
+      $PluginWhiteList = $PluginManager->EnabledPluginFolders();
+
+      $ForceRemapping = TRUE;
+
+      $this->Set($LocalName, $ApplicationWhiteList, $PluginWhiteList, $ForceRemapping);
+   }
+
    /**
     * Defines and loads the locale.
     *
     * @param string $LocaleName The name of the locale to load. Locale definitions are kept in each
     * application's locale folder. For example:
-    *  /garden/locale/$LocaleName.php
-    *  /people/locale/$LocaleName.php
+    *  /dashboard/locale/$LocaleName.php
+    *  /vanilla/locale/$LocaleName.php
     * @param array $ApplicationWhiteList An array of application folders that are safe to examine for locale
     *  definitions.
     * @param array $PluginWhiteList An array of plugin folders that are safe to examine for locale
@@ -83,16 +92,14 @@ class Gdn_Locale extends Gdn_Pluggable {
     *  automatically force a remapping.
     */
    public function Set($LocaleName, $ApplicationWhiteList, $PluginWhiteList, $ForceRemapping = FALSE) {
-      $LocaleMappings = PATH_CACHE . DS . 'locale_mappings.php';
       $SafeLocaleName = preg_replace('/([^\w\d_-])/', '', $LocaleName); // Removes everything from the string except letters, numbers, dashes, and underscores
       $LocaleSources = array();
       
       if(!is_array($ApplicationWhiteList)) $ApplicationWhiteList = array();
       if(!is_array($PluginWhiteList)) $PluginWhiteList = array();
 
-      if ($ForceRemapping === FALSE && file_exists($LocaleMappings)) {
-         include ($LocaleMappings);
-      } else {
+      Gdn_LibraryMap::PrepareCache('locale');
+      if ($ForceRemapping === TRUE || !Gdn_LibraryMap::CacheReady('locale')) {
          $LocaleSources = array();
          // Get application-based locale definition files
          $ApplicationLocaleSources = Gdn_FileSystem::FindAll(PATH_APPLICATIONS, CombinePaths(array('locale', $LocaleName, 'definitions.php')), $ApplicationWhiteList);
@@ -103,20 +110,28 @@ class Gdn_Locale extends Gdn_Pluggable {
          $PluginLocaleSources = Gdn_FileSystem::FindAll(PATH_PLUGINS, CombinePaths(array('locale', $LocaleName, 'definitions.php')), $PluginWhiteList);
          if ($PluginLocaleSources !== FALSE)
             $LocaleSources = array_merge($LocaleSources, $PluginLocaleSources);
+
+         // Get theme-based locale definition files.
+         $Theme = C('Garden.Theme');
+         if($Theme) {
+            $ThemeLocalePath = PATH_THEMES."/$Theme/locale/$LocaleName.php";
+            if(file_exists($ThemeLocalePath))
+               $LocaleSources[] = $ThemeLocalePath;
+         }
             
          // Save the mappings
          $FileContents = array();
-         $FileContents[] = "<?php if (!defined('APPLICATION')) exit();";
          $Count = count($LocaleSources);
          for($i = 0; $i < $Count; ++$i) {
-            $FileContents[] = "\$LocaleSources['" . $SafeLocaleName . "'][] = '" . Format::ArrayValueForPhp($LocaleSources[$i]) . "';";
+            $FileContents[$SafeLocaleName][] = Gdn_Format::ArrayValueForPhp($LocaleSources[$i]);
          }
+         
          // Add the config locale if it exists
          $ConfigLocale = PATH_CONF . DS . 'locale.php';
          if (file_exists($ConfigLocale))
-            $FileContents[] = "\$LocaleSources['" . $SafeLocaleName . "'][] = '" . $ConfigLocale . "';";
-            
-         Gdn_FileSystem::SaveFile($LocaleMappings, implode("\n", $FileContents));
+            $FileContents[$SafeLocaleName][] = $ConfigLocale;
+         
+         Gdn_LibraryMap::Import('locale', $FileContents);
       }
 
       // Set up defaults
@@ -125,16 +140,20 @@ class Gdn_Locale extends Gdn_Pluggable {
 
       // Now set the locale name and import all of the sources.
       $this->_Locale = $LocaleName;
-      if (!array_key_exists($SafeLocaleName, $LocaleSources))
-         $LocaleSources[$SafeLocaleName] = array();
+      $LocaleSources = Gdn_LibraryMap::GetCache('locale',$SafeLocaleName);
+      if (is_null($SafeLocaleName))
+         $LocaleSources = array();
 
-      $Count = count($LocaleSources[$SafeLocaleName]);
+      $ConfLocaleOverride = PATH_CONF . DS . 'locale.php';
+      $Count = count($LocaleSources);
       for($i = 0; $i < $Count; ++$i) {
-         @include ($LocaleSources[$SafeLocaleName][$i]);
+         if ($ConfLocaleOverride != $LocaleSources[$i] && file_exists($LocaleSources[$i])) // Don't double include the conf override file... and make sure it comes last
+            include_once($LocaleSources[$i]);
       }
 
       // Also load any custom defined definitions from the conf directory
-      @include (PATH_CONF . DS . 'locale.php');
+      if (file_exists($ConfLocaleOverride))
+         include_once($ConfLocaleOverride);
 
       // All of the included files should have contained
       // $Definition['Code'] = 'Definition'; assignments. The overwrote each
@@ -166,12 +185,15 @@ class Gdn_Locale extends Gdn_Pluggable {
     * Translates a code into the selected locale's definition.
     *
     * @param string $Code The code related to the language-specific definition.
+    *   Codes thst begin with an '@' symbol are treated as literals and not translated.
     * @param string $Default The default value to be displayed if the translation code is not found.
     * @return string
     */
    public function Translate($Code, $Default = '') {
-      $this->EventArguments['Code'] = $Code;
-      $this->FireEvent('BeforeTranslate');
+      // Codes that begin with @ are considered literals.
+      if(substr_compare('@', $Code, 0, 1) == 0)
+         return substr($Code, 1);
+
       if (array_key_exists($Code, $this->_Definition)) {
          return $this->_Definition[$Code];
       } else {
@@ -207,7 +229,7 @@ class Gdn_Locale extends Gdn_Pluggable {
     * @return array
     */
    public function GetAvailableLocaleSources() {
-      return Gdn_FileSystem::Folders(PATH_APPLICATIONS . DS . 'garden' . DS . 'locale');
+      return Gdn_FileSystem::Folders(PATH_APPLICATIONS . DS . 'dashboard' . DS . 'locale');
    }
 
 

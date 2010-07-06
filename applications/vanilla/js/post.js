@@ -27,7 +27,7 @@ jQuery(document).ready(function($) {
             // Remove any old popups
             $('.Popup').remove();
             // Add new popup with error
-            $.popup({}, definition('TransportError').replace('%s', textStatus));
+            $.popup({}, XMLHttpRequest.responseText);
          },
          success: function(json) {
             // Remove any old popups if not saving as a draft
@@ -37,7 +37,7 @@ jQuery(document).ready(function($) {
             // Assign the comment id to the form if it was defined
             if (json.CommentID != null && json.CommentID != '') {
                $(inpCommentID).val(json.CommentID);
-               definition('LastCommentID', json.CommentID, true);
+               gdn.definition('LastCommentID', json.CommentID, true);
             }
                
             if (json.DraftID != null && json.DraftID != '')
@@ -53,10 +53,11 @@ jQuery(document).ready(function($) {
                // Pop up the new preview.
                $.popup({}, json.Data);
             } else if (!draft && json.DiscussionUrl != null) {
+               $(frm).triggerHandler('complete');
                // Redirect to the discussion
                document.location = json.DiscussionUrl;
             }
-            inform(json.StatusMessage);
+            gdn.inform(json.StatusMessage);
          },
          complete: function(XMLHttpRequest, textStatus) {
             // Remove any spinners, and re-enable buttons.
@@ -64,6 +65,7 @@ jQuery(document).ready(function($) {
             $(frm).find(':submit').removeAttr("disabled");
          }
       });
+      $(frm).triggerHandler('submit');
       return false;
    });
    
@@ -89,7 +91,7 @@ jQuery(document).ready(function($) {
          dataType: 'json',
          error: function(XMLHttpRequest, textStatus, errorThrown) {
             $('.Popup').remove();
-            $.popup({}, definition('TransportError').replace('%s', textStatus));
+            $.popup({}, XMLHttpRequest.responseText);
          },
          success: function(json) {
             // Remove any old popups if not saving as a draft
@@ -114,10 +116,11 @@ jQuery(document).ready(function($) {
                $.popup({}, json.Data);
                
             } else if (!draft) {
+               $(frm).triggerHandler('complete');
                // Redirect to the new discussion
                document.location = json.RedirectUrl;
             }
-            inform(json.StatusMessage);
+            gdn.inform(json.StatusMessage);
          },
          complete: function(XMLHttpRequest, textStatus) {
             // Remove any spinners, and re-enable buttons.
@@ -125,6 +128,7 @@ jQuery(document).ready(function($) {
             $(frm).find(':submit').removeAttr("disabled");
          }
       });
+      $(frm).triggerHandler('submit');
       return false;
    });
    

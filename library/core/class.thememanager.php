@@ -61,33 +61,55 @@ class Gdn_ThemeManager {
       return $ThemeFolder;
    }
    
-   public function EnabledThemeInfo() {
+   public function EnabledThemeInfo($ReturnInSourceFormat = FALSE) {
       $AvailableThemes = $this->AvailableThemes();
       $ThemeFolder = $this->EnabledTheme();
       foreach ($AvailableThemes as $ThemeName => $ThemeInfo) {
          if (ArrayValue('Folder', $ThemeInfo, '') == $ThemeFolder)
-            return array($ThemeName => $ThemeInfo);
+            return $ReturnInSourceFormat ? array($ThemeName => $ThemeInfo) : $ThemeInfo;
+
       }
       return array();
    }
    
    public function EnableTheme($ThemeName) {
-      // 1. Make sure that the theme's requirements are met
-      $ApplicationManager = new Gdn_ApplicationManager();
-      $EnabledApplications = $ApplicationManager->EnabledApplications();
-      $AvailableThemes = $this->AvailableThemes();
-      $NewThemeInfo = ArrayValue($ThemeName, $AvailableThemes, array());
-      $RequiredApplications = ArrayValue('RequiredApplications', $NewThemeInfo, FALSE);
-      CheckRequirements($ThemeName, $RequiredApplications, $EnabledApplications, 'application'); // Applications
-
-      // 5. Set the theme
-      $ThemeFolder = ArrayValue('Folder', $NewThemeInfo, '');
+      // Make sure to run the setup
+      $this->TestTheme($ThemeName);
+      
+      // Set the theme
+      $ThemeFolder = ArrayValue('Folder', ArrayValue($ThemeName, $this->AvailableThemes(), array()), '');
       if ($ThemeFolder == '') {
          throw new Exception(T('The theme folder was not properly defined.'));
       } else {
          SaveToConfig('Garden.Theme', $ThemeFolder);
       }
-      
+
+      // Tell the locale cache to refresh itself.
+      $ApplicationManager = new Gdn_ApplicationManager();
+      Gdn::Locale()->Refresh();
+      return TRUE;
+   }
+   
+   public function TestTheme($ThemeName) {
+      // Make sure that the theme's requirements are met
+      $ApplicationManager = new Gdn_ApplicationManager();
+      $EnabledApplications = $ApplicationManager->EnabledApplications();
+      $AvailableThemes = $this->AvailableThemes();
+      $NewThemeInfo = ArrayValue($ThemeName, $AvailableThemes, array());
+      $RequiredApplications = ArrayValue('RequiredApplications', $NewThemeInfo, FALSE);
+      $ThemeFolder = ArrayValue('Folder', $NewThemeInfo, '');
+      CheckRequirements($ThemeName, $RequiredApplications, $EnabledApplications, 'application'); // Applications
+
+      // If there is a hooks file, include it and run the setup method.
+      $ClassName = $ThemeFolder . 'ThemeHooks';
+      $HooksFile = PATH_THEMES . DS . $ThemeFolder . DS . 'class.' . strtolower($ClassName) . '.php';
+      if (file_exists($HooksFile)) {
+         include($HooksFile);
+         if (class_exists($ClassName)) {
+            $ThemeHooks = new $ClassName();
+            $ThemeHooks->Setup();
+         }
+      }
       return TRUE;
    }
 }

@@ -132,7 +132,7 @@ class Gdn_Configuration {
       }
       
       if(is_string($Value))
-         $Result = Format::Unserialize($Value);
+         $Result = Gdn_Format::Unserialize($Value);
       else
          $Result = $Value;
          
@@ -160,24 +160,24 @@ class Gdn_Configuration {
       $KeyCount = count($Keys);
 
       $Array =& $this->_Data;
+      
       $SaveArray =& $this->_SaveData;
       for ($i = 0; $i < $KeyCount; ++$i) {
          $Key = $Keys[$i];
+         if (!is_array($Array)) $Array = array();
          $KeyExists = array_key_exists($Key, $Array);
 
          if($i == $KeyCount - 1) {   
             // If we are on the last iteration of the key, then set the value.
             if($KeyExists === FALSE || $Overwrite === TRUE) {
-               $Array[$Key] = Format::Serialize($Value);
-               $SaveArray[$Key] = Format::Serialize($Value);
+               $Array[$Key] = Gdn_Format::Serialize($Value);
+               $SaveArray[$Key] = Gdn_Format::Serialize($Value);
             }
          } else {
             // Otherwise, traverse the array
-            
             if($KeyExists === FALSE) {
                $Array[$Key] = array();
                $SaveArray[$Key] = array();
-               
             }
             $Array =& $Array[$Key];
             $SaveArray =& $SaveArray[$Key];
@@ -194,44 +194,57 @@ class Gdn_Configuration {
     * @todo This method may have to be recursive to remove empty arrays.
     */
    public function Remove($Name) {
+   
+      // The full merged config
       if(!is_array($this->_Data))
          return FALSE;
 
+      // The local override config
       if(!is_array($this->_SaveData))
          $this->_SaveData = array();
-
+      
       $Found = FALSE;
-      $Keys = explode('.', $Name);
-      $KeyCount = count($Keys);
+      $KeyParts = explode('.', $Name);
+      $KeyPartsCount = count($KeyParts);
 
-      $Array =& $this->_Data;
-      $SaveArray =& $this->_SaveData;
-      for($i = 0; $i < $KeyCount; ++$i) {
-         $Key = $Keys[$i];
+      $DataMergedConfig =& $this->_Data;
+      $DataLocalConfig =& $this->_SaveData;
+
+      for ($i = 0; $i < $KeyPartsCount; ++$i) {
          
-         if(array_key_exists($Key, $Array)) {
-            $SaveArrayKeyExists = !is_null($SaveArray) && array_key_exists($Key, $SaveArray);
-            
-            if($i == $KeyCount - 1) {
+         $Key = $KeyParts[$i];
+         
+         // Key will always be in here if it is anywhere at all
+         if (array_key_exists($Key, $DataMergedConfig)) {
+
+            // Does the key exist in the override file?
+            $LocalKeyExists = is_array($DataLocalConfig) && array_key_exists($Key, $DataLocalConfig);
+            if ($i == ($KeyPartsCount - 1)) {
                // We are at the setting, so unset it.
                $Found = TRUE;
-               unset($Array[$Key]);
-               if($SaveArrayKeyExists)
-                  unset($SaveArray[$Key]);
+               unset($DataMergedConfig[$Key]);
+               
+               // Only try to unset the local key if it exists
+               if ($LocalKeyExists)
+                  unset($DataLocalConfig[$Key]);
             } else {
                // Traverse the arrays.
-               $Array =& $Array[$Key];
-               if($SaveArrayKeyExists)
-                  $SaveArray =& $SaveArray[$Key];
+               $DataMergedConfig =& $DataMergedConfig[$Key];
+               
+               // Only try to traverse the local array if the key exists...
+               if ($LocalKeyExists)
+                  $DataLocalConfig =& $DataLocalConfig[$Key];
+               // ..otherwise, if its empty, unset it. Else just leave it alone.
                else
-                  $SaveArray = null;
+                  if (!sizeof($DataLocalConfig))
+                     $DataLocalConfig = null;
             }
          } else {
             $Found = FALSE;
             break;
          }
       }
-
+      
       return $Found;
    }
 
@@ -376,7 +389,7 @@ class Gdn_Configuration {
          $Session = Gdn::Session();
          $User = $Session->UserID > 0 && is_object($Session->User) ? $Session->User->Name : 'Unknown';
          $NewLines[] = '';
-         $NewLines[] = '// Last edited by '.$User.' '.Format::ToDateTime();
+         $NewLines[] = '// Last edited by '.$User.' (' . RemoteIp() . ')' . Gdn_Format::ToDateTime();
       }
 
       $FileContents = FALSE;
@@ -421,18 +434,20 @@ class Gdn_Configuration {
             }
          } else {
             // If $Value is not an associative array, just write it like a simple array definition.
-            $FormattedValue = array_map(array('Format', 'ArrayValueForPhp'), $Value);
+            $FormattedValue = array_map(array('Gdn_Format', 'ArrayValueForPhp'), $Value);
             $Array[] = $Prefix .= " = array('".implode("', '", $FormattedValue)."');";
          }
-      } else if (is_bool($Value)) {
+      } elseif (is_int($Value)) {
+			$Array[] = $Prefix .= ' = '.$Value.';';
+		} elseif (is_bool($Value)) {
          $Array[] = $Prefix .= ' = '.($Value ? 'TRUE' : 'FALSE').';';
-      } else if (in_array($Value, array('TRUE', 'FALSE'))) {
+      } elseif (in_array($Value, array('TRUE', 'FALSE'))) {
          $Array[] = $Prefix .= ' = '.($Value == 'TRUE' ? 'TRUE' : 'FALSE').';';
       } else {
          if (strpos($Value, "'") !== FALSE) {
-            $Array[] = $Prefix .= ' = "'.Format::ArrayValueForPhp(str_replace('"', '\"', $Value)).'";';
+            $Array[] = $Prefix .= ' = "'.Gdn_Format::ArrayValueForPhp(str_replace('"', '\"', $Value)).'";';
          } else {
-            $Array[] = $Prefix .= " = '".Format::ArrayValueForPhp($Value)."';";
+            $Array[] = $Prefix .= " = '".Gdn_Format::ArrayValueForPhp($Value)."';";
          }
       }
    }

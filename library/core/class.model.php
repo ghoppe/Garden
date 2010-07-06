@@ -23,11 +23,6 @@ Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
  * @namespace Garden.Core
  */
 
-
-if (!defined('APPLICATION'))
-   exit();
-
-
 /**
  * Represents, enforces integrity, and aids in the management of: data. This
  * generic model can be instantiated (with the table name it is intended to
@@ -42,7 +37,7 @@ class Gdn_Model extends Gdn_Pluggable {
    /**
     * An object representation of the current working dataset.
     *
-    * @var object
+    * @var Gdn_DataSet
     */
    public $Data;
 
@@ -108,7 +103,7 @@ class Gdn_Model extends Gdn_Pluggable {
     * related to this model. This object is defined and populated with
     * $this->DefineSchema().
     *
-    * @var object
+    * @var Gdn_Schema
     */
    public $Schema;
    
@@ -135,7 +130,7 @@ class Gdn_Model extends Gdn_Pluggable {
     * object. By default, this object only enforces maxlength, data types, and
     * required fields (defined when $this->DefineSchema() is called).
     *
-    * @var object
+    * @var Gdn_Validation
     */
    public $Validation;
 
@@ -226,8 +221,8 @@ class Gdn_Model extends Gdn_Pluggable {
     */
    public function Insert($Fields) {
       $Result = FALSE;
+      $this->AddInsertFields($Fields);
       if ($this->Validate($Fields, TRUE)) {
-         $this->AddInsertFields($Fields);
          $Result = $this->SQL->Insert($this->Name, $Fields);
       }
       return $Result;
@@ -242,7 +237,12 @@ class Gdn_Model extends Gdn_Pluggable {
     */
    public function Update($Fields, $Where = FALSE, $Limit = FALSE) {
       $Result = FALSE;
-      if ($this->Validate($Fields)) {
+      // primary key (always included in $Where when updating) might be "required"
+      $AllFields = $Fields;
+      if (is_array($Where))
+         $AllFields = array_merge($Fields, $Where); 
+         
+      if ($this->Validate($AllFields)) {
          $this->AddUpdateFields($Fields);
          $Result = $this->SQL->Put($this->Name, $Fields, $Where, $Limit);
       }
@@ -257,6 +257,9 @@ class Gdn_Model extends Gdn_Pluggable {
     * @todo add doc
     */
    public function Delete($Where = '', $Limit = FALSE, $ResetData = FALSE) {
+      if(is_numeric($Where))
+         $Where = array($this->Name.'ID' => $Where);
+
       if($ResetData) {
          $this->SQL->Delete($this->Name, $Where, $Limit);
       } else {
@@ -302,7 +305,7 @@ class Gdn_Model extends Gdn_Pluggable {
     * @param unknown_type $OrderDirection
     * @param unknown_type $Limit
     * @param unknown_type $Offset
-    * @return unknown
+    * @return Gdn_DataSet
     * @todo add doc
     */
    public function GetWhere($Where = FALSE, $OrderFields = '', $OrderDirection = 'asc', $Limit = FALSE, $Offset = FALSE) {
@@ -328,6 +331,7 @@ class Gdn_Model extends Gdn_Pluggable {
     * @todo add doc
     */
    public function Validate($FormPostValues, $Insert = FALSE) {
+      $this->DefineSchema();
       return $this->Validation->Validate($FormPostValues, $Insert);
    }
 
@@ -342,7 +346,7 @@ class Gdn_Model extends Gdn_Pluggable {
    protected function AddInsertFields(&$Fields) {
       $this->DefineSchema();
       if ($this->Schema->FieldExists($this->Name, $this->DateInserted)) {
-         $Fields[$this->DateInserted] = Format::ToDateTime();
+         $Fields[$this->DateInserted] = Gdn_Format::ToDateTime();
       }
 
       $Session = Gdn::Session();
@@ -361,7 +365,7 @@ class Gdn_Model extends Gdn_Pluggable {
    protected function AddUpdateFields(&$Fields) {
       $this->DefineSchema();
       if ($this->Schema->FieldExists($this->Name, $this->DateUpdated)) {
-         $Fields[$this->DateUpdated] = Format::ToDateTime();
+         $Fields[$this->DateUpdated] = Gdn_Format::ToDateTime();
       }
 
       $Session = Gdn::Session();
@@ -384,7 +388,7 @@ class Gdn_Model extends Gdn_Pluggable {
 			->FirstRow();
 		
 		if(!$Row) throw new Exception(T('ErrorRecordNotFound'));
-		$Values = Format::Unserialize($Row->$Column);
+		$Values = Gdn_Format::Unserialize($Row->$Column);
 		
 		if (is_string($Values) && $Values != '')
 			throw new Exception(T('Serialized column failed to be unserialized.'));
@@ -392,7 +396,7 @@ class Gdn_Model extends Gdn_Pluggable {
 		if (!is_array($Values)) $Values = array();
 		if (!is_array($Name)) $Name = array($Name => $Value); // Assign the new value(s)
 
-		$Values = Format::Serialize(array_merge($Values, $Name));
+		$Values = Gdn_Format::Serialize(array_merge($Values, $Name));
 		
 		// Save the values back to the db
 		return $this->SQL

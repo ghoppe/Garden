@@ -92,7 +92,7 @@ if (!function_exists('ValidateOldPassword')) {
    function ValidateOldPassword($Value, $Field, $FormPostedValues) {
       $OldPassword = ArrayValue('OldPassword', $FormPostedValues, '');
       $Session = Gdn::Session();
-      $UserModel = new Gdn_UserModel();
+      $UserModel = new UserModel();
       $UserID = $Session->UserID;
       return (bool) $UserModel->ValidateCredentials(
          '', $UserID, $OldPassword);
@@ -101,6 +101,8 @@ if (!function_exists('ValidateOldPassword')) {
 
 if (!function_exists('ValidateEmail')) {
    function ValidateEmail($Value, $Field = '') {
+      if($Value == '')
+         return TRUE; // required picks up this error
       return ValidateRegex(
          $Value,
          '/^([\w\d+_-][\w\d+_.-]{0,63})@(([\d]{1,3}\.[\d]{1,3}\.[\d]{1,3}\.[\d]{1,3})|([\w\d][\w\d.-]{0,244}\.[\w]{2,10}))$/'
@@ -111,7 +113,7 @@ if (!function_exists('ValidateUsername')) {
    function ValidateUsername($Value, $Field = '') {
       return ValidateRegex(
          $Value,
-         '/^([\d\w_]{3,20})$/si'
+         '/^([\d\w_]{3,20})?$/si'
       );
    }
 }
@@ -119,7 +121,7 @@ if (!function_exists('ValidateUrlString')) {
    function ValidateUrlString($Value, $Field = '') {
       return ValidateRegex(
          $Value,
-         '/^([\d\w_\-]+)$/si'
+         '/^([\d\w_\-]+)?$/si'
       );
    }
 }
@@ -127,19 +129,19 @@ if (!function_exists('ValidateUrlString')) {
 if (!function_exists('ValidateDate')) {
    function ValidateDate($Value) {
       // Dates should be in YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format
-      if (preg_match("/^[\d]{4}-{1}[\d]{2}-{1}[\d]{2}$/", $Value) == 1) {
-         $Year = intval(substr($Value, 0, 4));
-         $Month = intval(substr($Value, 5, 2));
-         $Day = intval(substr($Value, 8));
-         return checkdate($Month, $Day, $Year);
-      } else if (preg_match("/^[\d]{4}-{1}[\d]{2}-{1}[\d]{2}[\s]{1}[\d]{2}[:]{1}[\d]{2}[:]{1}[\d]{2}$/", $Value) == 1) {
-         $Year = intval(substr($Value, 0, 4));
-         $Month = intval(substr($Value, 5, 2));
-         $Day = intval(substr($Value, 8, 4));
-         $Hour = intval(substr($Value, 11, 2));
-         $Minute = intval(substr($Value, 14, 2));
-         $Second = intval(substr($Value, 17, 2));
-         return checkdate($Month, $Day, $Year) && $Hour < 24 && $Minute < 61 && $Second < 61;
+      if (strlen($Value) == 0) {
+			return TRUE; // blank dates validated through required.
+		} else {
+			$Matches = array();
+			if(preg_match('/^(\d{4})-(\d{2})-(\d{2})(?:\s{1}(\d{2}):(\d{2})(?::(\d{2}))?)?$/', $Value, $Matches)) {
+				$Year = $Matches[1];
+				$Month = $Matches[2];
+				$Day = $Matches[3];
+				$Hour = ArrayValue(4, $Matches, 0);
+				$Minutes = ArrayValue(5, $Matches, 0);
+				$Seconds = ArrayValue(6, $Matches, 0);
+			}
+         return checkdate($Month, $Day, $Year) && $Hour < 24 && $Minutes < 61 && $Seconds < 61;
       }
 
       return FALSE;

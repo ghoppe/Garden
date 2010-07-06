@@ -40,10 +40,18 @@ if (!function_exists('Anchor')) {
       
       if ($Attributes == '')
          $Attributes = array();
+			
+		$SSL = GetValue('SSL', $Attributes);
+		if ($SSL)
+			unset($Attributes['SSL']);
+		
+		$WithDomain = GetValue('WithDomain', $Attributes);
+		if ($WithDomain)
+			unset($Attributes['WithDomain']);
 
       $Prefix = substr($Destination, 0, 7);
-      if (!in_array($Prefix, array('http://', 'mailto:')) && ($Destination != '' || $ForceAnchor === FALSE))
-         $Destination = Url($Destination);
+      if (!in_array($Prefix, array('https:/', 'http://', 'mailto:')) && ($Destination != '' || $ForceAnchor === FALSE))
+         $Destination = Gdn::Request()->Url($Destination, $WithDomain, $SSL);
 
       return '<a href="'.$Destination.'"'.Attribute($CssClass).Attribute($Attributes).'>'.$Text.'</a>';
    }
@@ -56,7 +64,16 @@ if (!function_exists('Anchor')) {
  */
 if (!function_exists('FormatPossessive')) {
    function FormatPossessive($Word) {
+		if(function_exists('FormatPossessiveCustom'))
+			return FormatPossesiveCustom($Word);
+			
       return substr($Word, -1) == 's' ? $Word."'" : $Word."'s";
+   }
+}
+
+if (!function_exists('HoverHelp')) {
+   function HoverHelp($String, $Help) {
+      return Wrap($String.Wrap($Help, 'span', array('class' => 'Help')), 'span', array('class' => 'HoverHelp'));
    }
 }
 
@@ -133,5 +150,16 @@ if (!function_exists('UserPhoto')) {
       } else {
          return '';
       }
+   }
+}
+/**
+ * Wrap the provided string in the specified tag. ie. Wrap('This is bold!', 'b');
+ */
+if (!function_exists('Wrap')) {
+   function Wrap($String, $Tag = 'span', $Attributes = '') {
+      if (is_array($Attributes))
+         $Attributes = Attribute($Attributes);
+         
+      return '<'.$Tag.$Attributes.'>'.$String.'</'.$Tag.'>';
    }
 }
