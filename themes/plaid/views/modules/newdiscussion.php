@@ -1,0 +1,2 @@
+<?php if (!defined('APPLICATION')) exit();
+echo Anchor(T('<span>Start a New Discussion</span>'), '/post/discussion'.(array_key_exists('CategoryID', $Data) ? '/'.$Data['CategoryID'] : ''), 'BigButton NewDiscussion');
