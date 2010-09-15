@@ -134,15 +134,19 @@ class CategoryModel extends Gdn_Model {
       return $this->SQL->Get();
    }
 
-   public function GetFull($CategoryID = '') {
+   public function GetFull($CategoryID = '', $Permissions = FALSE) {
       $this->SQL
-         ->Select('c.CategoryID, c.Description, c.CountDiscussions, c.UrlCode')
-         ->Select("' &rarr; ', p.Name, c.Name", 'concat_ws', 'Name')
+         ->Select('c.Name, c.CategoryID, c.Description, c.CountDiscussions, c.UrlCode')
+         ->Select('p.CategoryID', '', 'ParentCategoryID')
+         ->Select('p.Name', '', 'ParentName')
          ->From('Category c')
          ->Join('Category p', 'c.ParentCategoryID = p.CategoryID', 'left')
          ->Where('c.AllowDiscussions', '1');
-         
-      $this->SQL->Permission('Vanilla.Discussions.View', 'c', 'CategoryID');
+
+      if (!$Permissions)
+         $Permissions = 'Vanilla.Discussions.View';
+
+      $this->SQL->Permission($Permissions, 'c', 'CategoryID');
 
       if (is_numeric($CategoryID) && $CategoryID > 0)
          return $this->SQL->Where('c.CategoryID', $CategoryID)->Get()->FirstRow();

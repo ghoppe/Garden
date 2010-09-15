@@ -18,8 +18,12 @@ $SQL = $Database->SQL();
 $Construct = $Database->Structure();
 
 // Role Table
-$Construct->Table('Role')
-	->Column('RoleID', 'int', FALSE, 'primary')
+$Construct->Table('Role');
+
+$RoleTableExists = $Construct->TableExists();
+
+$Construct
+   ->PrimaryKey('RoleID')
    ->Column('Name', 'varchar(100)')
    ->Column('Description', 'varchar(500)', TRUE)
    ->Column('Sort', 'int', TRUE)
@@ -27,25 +31,34 @@ $Construct->Table('Role')
    ->Column('CanSession', 'tinyint(1)', '1')
    ->Set($Explicit, $Drop);
 
-// Define some roles.
-// Note that every RoleID must be a power of two so that they can be combined as a bit-mask.
-$RoleModel = Gdn::Factory('RoleModel');
-$RoleModel->Database = $Database;
-$RoleModel->SQL = $SQL;
-$RoleModel->Define(array('Name' => 'Banned', 'RoleID' => 1, 'Sort' => '1', 'Deletable' => '1', 'CanSession' => '0', 'Description' => 'Banned users are not allowed to participate or sign in.'));
-$RoleModel->Define(array('Name' => 'Guest', 'RoleID' => 2, 'Sort' => '2', 'Deletable' => '0', 'CanSession' => '0', 'Description' => 'Guests can only view content. Anyone browsing the site who is not signed in is considered to be a "Guest".'));
-$RoleModel->Define(array('Name' => 'Applicant', 'RoleID' => 4, 'Sort' => '3', 'Deletable' => '0', 'CanSession' => '0', 'Description' => 'Users who have applied for membership, but have not yet been accepted. They have the same permissions as guests.'));
-$RoleModel->Define(array('Name' => 'Member', 'RoleID' => 8, 'Sort' => '4', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Members can participate in discussions.'));
-$RoleModel->Define(array('Name' => 'Moderator', 'RoleID' => 32, 'Sort' => '5', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Moderators have permission to edit most content.'));
-$RoleModel->Define(array('Name' => 'Administrator', 'RoleID' => 16, 'Sort' => '6', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Administrators have permission to do anything.'));
+if (!$RoleTableExists || $Drop) {
+   // Define some roles.
+   // Note that every RoleID must be a power of two so that they can be combined as a bit-mask.
+   $RoleModel = Gdn::Factory('RoleModel');
+   $RoleModel->Database = $Database;
+   $RoleModel->SQL = $SQL;
+   $RoleModel->Define(array('Name' => 'Banned', 'RoleID' => 1, 'Sort' => '1', 'Deletable' => '1', 'CanSession' => '0', 'Description' => 'Banned users are not allowed to participate or sign in.'));
+   $RoleModel->Define(array('Name' => 'Guest', 'RoleID' => 2, 'Sort' => '2', 'Deletable' => '0', 'CanSession' => '0', 'Description' => 'Guests can only view content. Anyone browsing the site who is not signed in is considered to be a "Guest".'));
+   $RoleModel->Define(array('Name' => 'Applicant', 'RoleID' => 4, 'Sort' => '3', 'Deletable' => '0', 'CanSession' => '0', 'Description' => 'Users who have applied for membership, but have not yet been accepted. They have the same permissions as guests.'));
+   $RoleModel->Define(array('Name' => 'Member', 'RoleID' => 8, 'Sort' => '4', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Members can participate in discussions.'));
+   $RoleModel->Define(array('Name' => 'Moderator', 'RoleID' => 32, 'Sort' => '5', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Moderators have permission to edit most content.'));
+   $RoleModel->Define(array('Name' => 'Administrator', 'RoleID' => 16, 'Sort' => '6', 'Deletable' => '1', 'CanSession' => '1', 'Description' => 'Administrators have permission to do anything.'));
+   $RoleModel->Define(array('Name' => 'Confirm Email', 'RoleID' => 3, 'Sort' => '7', 'Deletable' => '1', 'CanSession' => '0', 'Description' => 'Users must confirm their emails before becoming full members. They get assigned to this role.'));
+   unset($RoleModel);
+}
 
 // User Table
-$Construct->Table('User')
+$Construct->Table('User');
+
+$PhotoIDExists = $Construct->ColumnExists('PhotoID');
+$PhotoExists = $Construct->ColumnExists('Photo');
+
+$Construct
 	->PrimaryKey('UserID')
-   ->Column('PhotoID', 'int', TRUE, 'key')
    ->Column('Name', 'varchar(20)', FALSE, 'key')
    ->Column('Password', 'varbinary(50)')
 	->Column('HashMethod', 'varchar(10)', TRUE)
+   ->Column('Photo', 'varchar(255)', NULL)
    ->Column('About', 'text', TRUE)
    ->Column('Email', 'varchar(200)')
    ->Column('ShowEmail', 'tinyint(1)', '0')
@@ -66,22 +79,26 @@ $Construct->Table('User')
    ->Column('DateUpdated', 'datetime', TRUE)
    ->Column('HourOffset', 'int', '0')
 	->Column('Score', 'float', NULL)
-	// Add a role cache column to the user table so a user's multiple roles can be read as a single permission.
-	->Column('CacheRoleID', 'int', TRUE)
    ->Column('Admin', 'tinyint(1)', '0')
    ->Column('Deleted', 'tinyint(1)', '0')
    ->Set($Explicit, $Drop);
 
 // UserRole Table
-$Construct->Table('UserRole')
+$Construct->Table('UserRole');
+
+$UserRoleExists = $Construct->TableExists();
+
+$Construct
    ->Column('UserID', 'int', FALSE, 'primary')
    ->Column('RoleID', 'int', FALSE, 'primary')
    ->Set($Explicit, $Drop);
-	
-// Assign the guest user to the guest role
-$SQL->Replace('UserRole', array(), array('UserID' => 0, 'RoleID' => 2));
-// Assign the admin user to admin role
-$SQL->Replace('UserRole', array(), array('UserID' => 1, 'RoleID' => 16));
+
+if (!$UserRoleExists) {
+   // Assign the guest user to the guest role
+   $SQL->Replace('UserRole', array(), array('UserID' => 0, 'RoleID' => 2));
+   // Assign the admin user to admin role
+   $SQL->Replace('UserRole', array(), array('UserID' => 1, 'RoleID' => 16));
+}
 
 // User Meta Table
 $Construct->Table('UserMeta')
@@ -164,13 +181,13 @@ $PermissionModel->Define(array(
 // Set initial member permissions.
 $PermissionModel->Save(array(
 	'RoleID' => 8,
-	'Garden.Signin.Allow' => 1
+	'Garden.SignIn.Allow' => 1
 	));
 
 // Set initial moderator permissions.
 $PermissionModel->Save(array(
 	'RoleID' => 32,
-	'Garden.Signin.Allow' => 1
+	'Garden.SignIn.Allow' => 1
 	));
 
 // Set initial admininstrator permissions.
@@ -193,7 +210,11 @@ $PermissionModel->Save(array(
 	));
 
 // Photo Table
-$Construct->Table('Photo')
+$Construct->Table('Photo');
+
+$PhotoTableExists = $Construct->TableExists('Photo');
+
+$Construct
 	->PrimaryKey('PhotoID')
    ->Column('Name', 'varchar(255)')
    ->Column('InsertUserID', 'int', TRUE, 'key')
@@ -251,7 +272,9 @@ if ($SQL->GetWhere('ActivityType', array('Name' => 'PictureChange'))->NumRows() 
 if ($SQL->GetWhere('ActivityType', array('Name' => 'RoleChange'))->NumRows() == 0)
    $SQL->Insert('ActivityType', array('AllowComments' => '1', 'Name' => 'RoleChange', 'FullHeadline' => '%1$s changed %4$s permissions.', 'ProfileHeadline' => '%1$s changed %4$s permissions.', 'Notify' => '1'));
 if ($SQL->GetWhere('ActivityType', array('Name' => 'ActivityComment'))->NumRows() == 0)
-   $SQL->Insert('ActivityType', array('AllowComments' => '0', 'ShowIcon' => '1', 'Name' => 'ActivityComment', 'FullHeadline' => '%1$s commented on %4$s %8$s.', 'ProfileHeadline' => '%1$s', 'RouteCode' => 'activity', 'Notify' => '1')); 
+   $SQL->Insert('ActivityType', array('AllowComments' => '0', 'ShowIcon' => '1', 'Name' => 'ActivityComment', 'FullHeadline' => '%1$s commented on %4$s %8$s.', 'ProfileHeadline' => '%1$s', 'RouteCode' => 'activity', 'Notify' => '1'));
+if ($SQL->GetWhere('ActivityType', array('Name' => 'Import'))->NumRows() == 0)
+   $SQL->Insert('ActivityType', array('AllowComments' => '0', 'Name' => 'Import', 'FullHeadline' => '%1$s imported data.', 'ProfileHeadline' => '%1$s imported data.', 'Notify' => '1', 'Public' => '0'));
 
 // Activity Table
 // Column($Name, $Type, $Length = '', $Null = FALSE, $Default = NULL, $KeyType = FALSE, $AutoIncrement = FALSE)
@@ -281,4 +304,24 @@ $Construct->Table('Message')
    ->Column('AssetTarget', 'varchar(20)', TRUE)
 	->Column('CssClass', 'varchar(20)', TRUE)
    ->Column('Sort', 'int', TRUE)
+   ->Set($Explicit, $Drop);
+
+$Prefix = $SQL->Database->DatabasePrefix;
+
+if ($PhotoIDExists && !$PhotoExists) {
+   $Construct->Query("update {$Prefix}User u
+   join {$Prefix}Photo p
+      on u.PhotoID = p.PhotoID
+   set u.Photo = p.Name");
+}
+
+if ($PhotoIDExists) {
+   $Construct->Table('User')->DropColumn('PhotoID');
+}
+
+$Construct->Table('Tag')
+	->PrimaryKey('TagID')
+   ->Column('Name', 'varchar(255)')
+   ->Column('InsertUserID', 'int', TRUE, 'key')
+   ->Column('DateInserted', 'datetime')
    ->Set($Explicit, $Drop);

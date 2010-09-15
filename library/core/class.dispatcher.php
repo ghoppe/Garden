@@ -177,6 +177,12 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
       $this->FireEvent('BeforeDispatch');
       $this->_AnalyzeRequest($Request);
       
+      // Send user to login page if this is a private community
+      if (C('Garden.PrivateCommunity') && $this->ControllerName() != 'EntryController' && !Gdn::Session()->IsValid()) {
+         Redirect(Gdn::Authenticator()->SignInUrl($this->Request));
+         exit();
+      }
+         
       /*
       echo "<br />Gdn::Request thinks: ".Gdn::Request()->Path();
       echo "<br />Gdn::Request also suggests: output=".Gdn::Request()->OutputFormat().", filename=".Gdn::Request()->Filename();
@@ -220,8 +226,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
          $Controller->OriginalRequestMethod = $ControllerMethod;
          
          // Take enabled plugins into account, as well
-         $PluginManager = Gdn::Factory('PluginManager');
-         $PluginManagerHasReplacementMethod = $PluginManager->HasNewMethod($this->ControllerName(), $this->_ControllerMethod);
+         $PluginManagerHasReplacementMethod = Gdn::PluginManager()->HasNewMethod($this->ControllerName(), $this->_ControllerMethod);
          if (!$PluginManagerHasReplacementMethod && ($this->_ControllerMethod == '' || !method_exists($Controller, $ControllerMethod))) {
             // Check to see if there is an 'x' version of the method.
             if (method_exists($Controller, 'x'.$ControllerMethod)) {
@@ -234,7 +239,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
                $this->_ControllerMethod = 'Index';
                $ControllerMethod = 'Index';
                
-               $PluginManagerHasReplacementMethod = $PluginManager->HasNewMethod($this->ControllerName(), $this->_ControllerMethod);
+               $PluginManagerHasReplacementMethod = Gdn::PluginManager()->HasNewMethod($this->ControllerName(), $this->_ControllerMethod);
             }
          }
          // Pass in the querystring values
@@ -255,7 +260,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
             //call_user_func_array(array($Controller, $ControllerMethod), $this->_ControllerMethodArgs);
             
             if ($PluginManagerHasReplacementMethod) {
-              $PluginManager->CallNewMethod($Controller, $Controller->ControllerName, $ControllerMethod);
+              Gdn::PluginManager()->CallNewMethod($Controller, $Controller->ControllerName, $ControllerMethod);
             } else {
               
               $Args = $this->_ControllerMethodArgs;
@@ -351,7 +356,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
     * @param int $FolderDepth
     * @todo $folderDepth needs a description.
     */
-   protected function _AnalyzeRequest(&$Request, $FolderDepth = 2) {
+   protected function _AnalyzeRequest(&$Request, $FolderDepth = 1) {
       // Here are some examples of what this method could/would receive:
       // /application/controllergroup/controller/method/argn
       // /controllergroup/controller/method/argn
@@ -370,8 +375,38 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
       $this->_ControllerName = '';
       $this->_ControllerMethod = 'index';
       $this->_ControllerMethodArgs = array();
-      
       $this->Request = $Request->Path();
+
+      $PathAndQuery = $Request->PathAndQuery();
+      $MatchRoute = Gdn::Router()->MatchRoute($PathAndQuery);
+
+      // We have a route. Take action.
+      if ($MatchRoute !== FALSE) {
+         switch ($MatchRoute['Type']) {
+            case 'Internal':
+               $Request->PathAndQuery($MatchRoute['FinalDestination']);
+               $this->Request = $MatchRoute['FinalDestination'];
+               break;
+
+            case 'Temporary':
+               Header( "HTTP/1.1 302 Moved Temporarily" );
+               Header( "Location: ".$MatchRoute['FinalDestination'] );
+               exit();
+               break;
+
+            case 'Permanent':
+               Header( "HTTP/1.1 301 Moved Permanently" );
+               Header( "Location: ".$MatchRoute['FinalDestination'] );
+               exit();
+               break;
+
+            case 'NotFound':
+               Header( "HTTP/1.1 404 Not Found" );
+               $this->Request = $MatchRoute['FinalDestination'];
+               break;
+         }
+      }
+
 
       switch ($Request->OutputFormat()) {
          case 'rss':
@@ -390,35 +425,6 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
       {
          $DefaultController = Gdn::Router()->GetRoute('DefaultController');
          $this->Request = $DefaultController['Destination'];
-      }
-
-      // Check for re-routing
-      $MatchRoute = Gdn::Router()->MatchRoute($this->Request);
-      
-      // We have a route. Take action.
-      if ($MatchRoute !== FALSE) {
-         switch ($MatchRoute['Type']) {
-            case 'Internal':
-               $this->Request = $MatchRoute['FinalDestination'];
-               break;
-            
-            case 'Temporary':
-               Header( "HTTP/1.1 302 Moved Temporarily" );
-               Header( "Location: ".$MatchRoute['FinalDestination'] ); 
-               exit();
-               break;
-            
-            case 'Permanent':
-               Header( "HTTP/1.1 301 Moved Permanently" );
-               Header( "Location: ".$MatchRoute['FinalDestination'] );
-               exit();
-               break;
-            
-            case 'NotFound':
-               Header( "HTTP/1.1 404 Not Found" );
-               $this->Request = $MatchRoute['FinalDestination'];
-               break;
-         }
       }
    
       $Parts = explode('/', $this->Request);
@@ -498,7 +504,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
             // application to search in for a view file).
             $this->_ApplicationFolder = explode(DS, str_replace(PATH_APPLICATIONS . DS, '', $ControllerPath));
             $this->_ApplicationFolder = $this->_ApplicationFolder[0];
-            $AppControllerName = strtolower($this->_ApplicationFolder).'Controller';
+            $AppControllerName = ucfirst(strtolower($this->_ApplicationFolder)).'Controller';
 
             // Load the application's master controller
             if (!class_exists($AppControllerName))
@@ -543,7 +549,7 @@ class Gdn_Dispatcher extends Gdn_Pluggable {
    private function _MapParts($Parts, $ControllerKey) {
       $Length = count($Parts);
       if ($Length > $ControllerKey)
-         $this->_ControllerName = $Parts[$ControllerKey];
+         $this->_ControllerName = ucfirst(strtolower($Parts[$ControllerKey]));
 
       if ($Length > $ControllerKey + 1)
          $this->_ControllerMethod = $Parts[$ControllerKey + 1];

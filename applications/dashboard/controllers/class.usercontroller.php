@@ -22,7 +22,7 @@ class UserController extends DashboardController {
          '',
          FALSE
       );
-      $this->AddJsFile('js/library/jquery.gardenmorepager.js');
+      $this->AddJsFile('jquery.gardenmorepager.js');
       $this->AddJsFile('user.js');
       $this->Title(T('Users'));
 
@@ -43,10 +43,10 @@ class UserController extends DashboardController {
          $this->Form->SetFormValue('Keywords', $Keywords);
 
       $UserModel = new UserModel();
-      $Like = trim($Keywords) == '' ? FALSE : array('u.Name' => $Keywords, 'u.Email' => $Keywords);
+      //$Like = trim($Keywords) == '' ? FALSE : array('u.Name' => $Keywords, 'u.Email' => $Keywords);
       $Limit = 30;
-      $TotalRecords = $UserModel->GetCountLike($Like);
-      $this->UserData = $UserModel->GetLike($Like, 'u.Name', 'asc', $Limit, $Offset);
+      $TotalRecords = $UserModel->SearchCount($Keywords);
+      $this->UserData = $UserModel->Search($Keywords, 'u.Name', 'asc', $Limit, $Offset);
 
       // Build a pager
       $PagerFactory = new Gdn_PagerFactory();
@@ -104,7 +104,7 @@ class UserController extends DashboardController {
 	public function Applicants() {
       $this->Permission('Garden.Users.Approve');
       $this->AddSideMenu('dashboard/user/applicants');
-      $this->AddJsFile('/js/library/jquery.gardencheckcolumn.js');
+      $this->AddJsFile('jquery.gardencheckcolumn.js');
       $this->Title(T('Applicants'));
 
       if ($this->Form->AuthenticatedPostBack() === TRUE) {
@@ -127,10 +127,12 @@ class UserController extends DashboardController {
 	public function Approve($UserID = '', $PostBackKey = '') {
       $this->Permission('Garden.Users.Approve');
       $Session = Gdn::Session();
-      if ($Session->ValidateTransientKey($PostBackKey))
-         if($this->HandleApplicant('Approve', $UserID)) {
+      if ($Session->ValidateTransientKey($PostBackKey)) {
+         $Approved = $this->HandleApplicant('Approve', $UserID);
+         if ($Approved) {
             $this->StatusMessage = T('Your changes have been saved.');
          }
+      }
 
       if ($this->_DeliveryType == DELIVERY_TYPE_BOOL) {
          return $this->Form->ErrorCount() == 0 ? TRUE : $this->Form->Errors();
@@ -260,20 +262,16 @@ class UserController extends DashboardController {
          $Result = FALSE;
       } else {
          $Session = Gdn::Session();
-         //if (!$Session->CheckPermission('Garden.Users.Approve')) {
-         //   $this->Form->AddError('ErrorPermission');
-         //} else {
-            $UserModel = new UserModel();
-            if (is_numeric($UserID)) {
-               try {
-                  $Email = new Gdn_Email();
-                  $Result = $UserModel->$Action($UserID, $Email);
-               } catch(Exception $ex) {
-                  $Result = FALSE;
-                  $this->Form->AddError(strip_tags($ex->getMessage()));
-               }
+         $UserModel = new UserModel();
+         if (is_numeric($UserID)) {
+            try {
+               $Email = new Gdn_Email();
+               $Result = $UserModel->$Action($UserID, $Email);
+            } catch(Exception $ex) {
+               $Result = FALSE;
+               $this->Form->AddError(strip_tags($ex->getMessage()));
             }
-         //}
+         }
       }
    }
 

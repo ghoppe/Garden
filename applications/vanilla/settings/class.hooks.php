@@ -12,7 +12,7 @@ class VanillaHooks implements Gdn_IPlugin {
    
    public function UserModel_SessionQuery_Handler(&$Sender) {
       // Add some extra fields to the session query
-      $Sender->SQL->Select('u.CountDiscussions, u.CountUnreadDiscussions, u.CountDrafts, u.CountBookmarks');
+      //$Sender->SQL->Select('u.CountDiscussions, u.CountUnreadDiscussions, u.CountDrafts, u.CountBookmarks');
    }
    
 	// Remove data when deleting a user
@@ -60,9 +60,7 @@ class VanillaHooks implements Gdn_IPlugin {
       // Add menu items.
       $Session = Gdn::Session();
       if ($Sender->Menu) {
-         $Sender->Menu->AddLink(T('Discussions'), T('Discussions'), '/discussions', FALSE);
-         // if ($Session->IsValid())
-         //   $Sender->Menu->AddLink(T('Discussions'), T('New Discussion'), '/post/discussion', FALSE);
+         $Sender->Menu->AddLink('Discussions', T('Discussions'), '/discussions', FALSE);
       }
    }
    
@@ -72,7 +70,7 @@ class VanillaHooks implements Gdn_IPlugin {
          $Sender->AddProfileTab(T('Discussions'), 'profile/discussions/'.$Sender->User->UserID.'/'.urlencode($Sender->User->Name));
          // Add the discussion tab's css
          $Sender->AddCssFile('vanillaprofile.css', 'vanilla');
-         $Sender->AddJsFile('/js/library/jquery.gardenmorepager.js');
+         $Sender->AddJsFile('jquery.gardenmorepager.js');
          $Sender->AddJsFile('discussions.js');
       }
    }

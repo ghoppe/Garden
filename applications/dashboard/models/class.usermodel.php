@@ -34,10 +34,8 @@ class UserModel extends Gdn_Model {
 
    public function UserQuery() {
       $this->SQL->Select('u.*')
-         ->Select('p.Name', '', 'Photo')
          ->Select('i.Name', '', 'InviteName')
          ->From('User u')
-         ->Join('Photo as p', 'u.PhotoID = p.PhotoID', 'left')
          ->Join('User as i', 'u.InviteUserID = i.UserID', 'left');
    }
 
@@ -113,17 +111,19 @@ class UserModel extends Gdn_Model {
       return $this->SQL->Select('u.*')
          ->From('User u')
          ->Join('UserRole ur', 'u.UserID = ur.UserID')
-         ->Where('ur.RoleID', '4', TRUE, FALSE) // 4 is Applicant RoleID
+         ->Where('ur.RoleID', (int)C('Garden.Registration.ApplicantRoleID', 0), TRUE, FALSE)
          ->GroupBy('UserID')
          ->OrderBy('DateInserted', 'desc')
          ->Get();
    }
 
    public function GetCountLike($Like = FALSE) {
+      $ApplicantRoleID = (int)C('Garden.Registration.ApplicantRoleID', 0);
+
       $this->SQL
          ->Select('u.UserID', 'count', 'UserCount')
          ->From('User u')
-         ->Join('UserRole ur', 'u.UserID = ur.UserID and ur.RoleID = 4', 'left'); // 4 is Applicant RoleID
+         ->Join('UserRole ur', "u.UserID = ur.UserID and ur.RoleID = $ApplicantRoleID", 'left');
       if (is_array($Like)){
          $this->SQL
 				->BeginWhereGroup()
@@ -143,7 +143,7 @@ class UserModel extends Gdn_Model {
       $this->SQL
          ->Select('u.UserID', 'count', 'UserCount')
          ->From('User u')
-         ->Join('UserRole ur', 'u.UserID = ur.UserID and ur.RoleID = 4', 'left'); // 4 is Applicant RoleID
+         ->Join('UserRole ur', 'u.UserID = ur.UserID and ur.RoleID = '.(int)C('Garden.Registration.ApplicantRoleID', 0), 'left');
 		
 		if (is_array($Where))
          $this->SQL->Where($Where);
@@ -158,9 +158,11 @@ class UserModel extends Gdn_Model {
    }
 
    public function GetLike($Like = FALSE, $OrderFields = '', $OrderDirection = 'asc', $Limit = FALSE, $Offset = FALSE) {
+      $ApplicantRoleID = (int)C('Garden.Registration.ApplicantRoleID', 0);
+
       $this->UserQuery();
       $this->SQL
-         ->Join('UserRole ur', 'u.UserID = ur.UserID and ur.RoleID = 4', 'left'); // 4 is Applicant RoleID
+         ->Join('UserRole ur', "u.UserID = ur.UserID and ur.RoleID = $ApplicantRoleID", 'left');
 
       if (is_array($Like)) {
          $this->SQL
@@ -193,10 +195,10 @@ class UserModel extends Gdn_Model {
       }
 
       $this->SQL
-         ->Select('u.UserID, u.Name, u.Preferences, u.Permissions, u.Attributes, u.HourOffset, u.CountNotifications, u.Admin, u.DateLastActive')
-         ->Select('p.Name', '', 'Photo')
+         ->Select('u.*')
+         //->Select('u.UserID, u.Name, u.Preferences, u.Permissions, u.Attributes, u.HourOffset, u.CountNotifications, u.Admin, u.DateLastActive')
+         //->Select('u.Photo', '', 'Photo')
          ->From('User u')
-         ->Join('Photo as p', 'u.PhotoID = p.PhotoID', 'left')
          // Removing this for now. Will break existing installs because you need to have a session to be authenticated to run the structure changes.
          // ->Where('u.Deleted', 0)
          ->Where('u.UserID', $UserID);
@@ -222,7 +224,7 @@ class UserModel extends Gdn_Model {
    public function RemovePicture($UserID) {
       $this->SQL
          ->Update('User')
-         ->Set('PhotoID', 'null', FALSE)
+         ->Set('Photo', 'null', FALSE)
          ->Where('UserID', $UserID)
          ->Put();
    }
@@ -299,7 +301,7 @@ class UserModel extends Gdn_Model {
                // Record activity if the person changed his/her photo
                $Photo = ArrayValue('Photo', $FormPostValues);
                if ($Photo !== FALSE)
-                  AddActivity($UserID, 'PictureChange', '<img src="'.Asset('uploads/t'.$Photo).'" alt="'.T('Thumbnail').'" />');
+                  AddActivity($UserID, 'PictureChange', '<img src="'.Asset('uploads/'.ChangeBasename($Photo, 't%s')).'" alt="'.T('Thumbnail').'" />');
    
             } else {
                $RecordRoleChange = FALSE;
@@ -430,15 +432,8 @@ class UserModel extends Gdn_Model {
          if (is_numeric($InsertRoleID))
             $this->SQL->Insert('UserRole', array('UserID' => $UserID, 'RoleID' => $InsertRoleID));
       }      
-      
-      // 3. Figure out the ID that is a combination of all of the roles.
-      $CacheRoleID = 0;
-      foreach($RoleIDs as $RoleID) {
-         $CacheRoleID = $CacheRoleID | $RoleID;
-      }
 
-
-      // 4. Remove the cached permissions for this user.
+      // 3. Remove the cached permissions for this user.
       // Note: they are not reset here because I want this action to be
       // performed in one place - /dashboard/library/core/class.session.php
       // It is done in the session because when a role's permissions are changed
@@ -503,6 +498,73 @@ class UserModel extends Gdn_Model {
             $UserID
          );
       }
+   }
+
+   public function Search($Keywords, $OrderFields = '', $OrderDirection = 'asc', $Limit = FALSE, $Offset = FALSE) {
+      $ApplicantRoleID = (int)C('Garden.Registration.ApplicantRoleID', 0);
+
+      // Check to see if the search exactly matches a role name.
+      $RoleID = $this->SQL->GetWhere('Role', array('Name' => $Keywords))->Value('RoleID');
+
+      $this->UserQuery();
+      $this->SQL
+         ->Join('UserRole ur', "u.UserID = ur.UserID and ur.RoleID = $ApplicantRoleID", 'left');
+
+      if ($RoleID) {
+         $this->SQL->Join('UserRole ur2', "u.UserID = ur2.UserID and ur2.RoleID = $RoleID");
+      } else {
+         // Search on the user table.
+         $Like = trim($Keywords) == '' ? FALSE : array('u.Name' => $Keywords, 'u.Email' => $Keywords);
+         
+         if (is_array($Like)) {
+            $this->SQL
+               ->BeginWhereGroup()
+               ->OrLike($Like, '', 'right')
+               ->EndWhereGroup();
+         }
+      }
+
+      return $this->SQL
+         ->Where('u.Deleted', 0)
+         ->Where('ur.RoleID is null')
+         ->OrderBy($OrderFields, $OrderDirection)
+         ->Limit($Limit, $Offset)
+         ->Get();
+   }
+
+   public function SearchCount($Keywords = FALSE) {
+      $ApplicantRoleID = (int)C('Garden.Registration.ApplicantRoleID', 0);
+
+
+      // Check to see if the search exactly matches a role name.
+      $RoleID = $this->SQL->GetWhere('Role', array('Name' => $Keywords))->Value('RoleID');
+      
+      $this->SQL
+         ->Select('u.UserID', 'count', 'UserCount')
+         ->From('User u')
+         ->Join('UserRole ur', "u.UserID = ur.UserID and ur.RoleID = $ApplicantRoleID", 'left');
+
+      if ($RoleID) {
+         $this->SQL->Join('UserRole ur2', "u.UserID = ur2.UserID and ur2.RoleID = $RoleID");
+      } else {
+         // Search on the user table.
+         $Like = trim($Keywords) == '' ? FALSE : array('u.Name' => $Keywords, 'u.Email' => $Keywords);
+
+         if (is_array($Like)) {
+            $this->SQL
+               ->BeginWhereGroup()
+               ->OrLike($Like, '', 'right')
+               ->EndWhereGroup();
+         }
+      }
+
+		$this->SQL
+         ->Where('u.Deleted', 0)
+         ->Where('ur.RoleID is null');
+
+		$Data =  $this->SQL->Get()->FirstRow();
+
+      return $Data === FALSE ? 0 : $Data->UserCount;
    }
 
    /**
@@ -583,7 +645,7 @@ class UserModel extends Gdn_Model {
          );
 
          // Save the user's roles
-         $RoleIDs = Gdn::Config('Garden.Registration.DefaultRoles', array(4)); // 4 is "Applicant"
+         $RoleIDs = (array)Gdn::Config('Garden.Registration.DefaultRoles', C('Garden.Registration.ApplicantRoleID', array()));
          $this->SaveRoles($UserID, $RoleIDs, FALSE);
       } else {
          $UserID = FALSE;
@@ -859,6 +921,8 @@ class UserModel extends Gdn_Model {
     * Approve a membership applicant.
     */
    public function Approve($UserID, $Email) {
+      $ApplicantRoleID = C('Garden.Registration.ApplicantRoleID', 0);
+
       // Make sure the $UserID is an applicant
       $RoleData = $this->GetRoles($UserID);
       if ($RoleData->NumRows() == 0) {
@@ -866,7 +930,7 @@ class UserModel extends Gdn_Model {
       } else {
          $ApplicantFound = FALSE;
          foreach ($RoleData->Result() as $Role) {
-            if ($Role->RoleID == 4)
+            if ($Role->RoleID == $ApplicantRoleID)
                $ApplicantFound = TRUE;
          }
       }
@@ -881,12 +945,11 @@ class UserModel extends Gdn_Model {
          // Send out a notification to the user
          $User = $this->Get($UserID);
          if ($User) {
-/*
-            $Email->Subject(sprintf(T('[%1$s] Membership Approved'), Gdn::Config('Garden.Title')));
-            $Email->Message(sprintf(T('EmailMembershipApproved'), $User->Name, Url(Gdn::Authenticator()->SignInUrl(), TRUE)));
-            $Email->To($User->Email);
-            $Email->Send();
-*/
+				$Email->Subject(sprintf(T('[%1$s] Membership Approved'), C('Garden.Title')));
+				$Email->Message(sprintf(T('EmailMembershipApproved'), $User->Name, Url(Gdn::Authenticator()->SignInUrl(), TRUE)));
+				$Email->To($User->Email);
+				//$Email->From(C('Garden.SupportEmail'), C('Garden.SupportName'));
+				$Email->Send();
          }
 
          // Report that the user was approved
@@ -934,7 +997,7 @@ class UserModel extends Gdn_Model {
       $this->SQL->Update('User')
          ->Set(array(
             'Name' => '[Deleted User]',
-            'PhotoID' => 'null',
+            'Photo' => 'null',
             'Password' => RandomString('10'),
             'About' => '',
             'Email' => 'user_'.$UserID.'@deleted.email',
@@ -952,11 +1015,10 @@ class UserModel extends Gdn_Model {
             'DateOfBirth' => null,
             'DateFirstVisit' => null,
             'DateLastActive' => null,
-            'DateInserted' => '1975-09-16 00:00:00',
-            'DateUpdated' => null,
+//            'DateInserted' => '1975-09-16 00:00:00',
+            'DateUpdated' => Gdn_Format::ToDateTime(),
             'HourOffset' => '0',
             'Score' => null,
-            'CacheRoleID' => null,
             'Admin' => 0,
             'Deleted' => 1
             ))
@@ -974,7 +1036,7 @@ class UserModel extends Gdn_Model {
       } else {
          $ApplicantFound = FALSE;
          foreach ($RoleData->Result() as $Role) {
-            if ($Role->RoleID == 4)
+            if ($Role->RoleID == C('Garden.Registration.ApplicantRoleID', 0))
                $ApplicantFound = TRUE;
          }
       }
@@ -1227,7 +1289,7 @@ class UserModel extends Gdn_Model {
       $Email = new Gdn_Email();
       $Email->Subject(sprintf(T('[%s] Welcome Aboard!'), $AppTitle));
       $Email->To($User->Email);
-      $Email->From($Sender->Email, $Sender->Name);
+      //$Email->From($Sender->Email, $Sender->Name);
       $Email->Message(
          sprintf(
             T('EmailWelcome'),
@@ -1250,7 +1312,7 @@ class UserModel extends Gdn_Model {
       $Email = new Gdn_Email();
       $Email->Subject(sprintf(T('[%s] Password Reset'), $AppTitle));
       $Email->To($User->Email);
-      $Email->From($Sender->Email, $Sender->Name);
+      //$Email->From($Sender->Email, $Sender->Name);
       $Email->Message(
          sprintf(
             T('EmailPassword'),
@@ -1329,7 +1391,7 @@ class UserModel extends Gdn_Model {
       $Email = new Gdn_Email();
       $Email->Subject(sprintf(T('[%s] Password Reset Request'), $AppTitle));
       $Email->To($User->Email);
-      $Email->From(Gdn::Config('Garden.Support.Email'), Gdn::Config('Garden.Support.Name'));
+      //$Email->From(Gdn::Config('Garden.Support.Email'), Gdn::Config('Garden.Support.Name'));
       $Email->Message(
          sprintf(
             T('PasswordRequest'),

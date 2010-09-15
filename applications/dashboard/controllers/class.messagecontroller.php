@@ -49,13 +49,13 @@ class MessageController extends DashboardController {
       }
       
       if ($this->_DeliveryType === DELIVERY_TYPE_ALL)
-         Redirect(GetIncomingValue('Target', '/vanilla/discussions'));
+         Redirect(GetIncomingValue('Target', '/discussions'));
 
       $this->Render();      
    }
    
    public function Edit($MessageID = '') {
-      $this->AddJsFile('js/library/jquery.autogrow.js');
+      $this->AddJsFile('jquery.autogrow.js');
       $this->AddJsFile('messages.js');
          
       $this->Permission('Garden.Messages.Manage');
@@ -84,7 +84,7 @@ class MessageController extends DashboardController {
             
             // Redirect
             $this->StatusMessage = T('Your changes have been saved.');
-            $this->RedirectUrl = Url('dashboard/message');
+            //$this->RedirectUrl = Url('dashboard/message');
          }
       }
       $this->Render();
@@ -93,9 +93,9 @@ class MessageController extends DashboardController {
    public function Index() {
       $this->Permission('Garden.Messages.Manage');
       $this->AddSideMenu('dashboard/message');
-      $this->AddJsFile('/js/library/jquery.autogrow.js');
-      $this->AddJsFile('/js/library/jquery.tablednd.js');
-      $this->AddJsFile('/js/library/jquery.ui.packed.js');
+      $this->AddJsFile('jquery.autogrow.js');
+      $this->AddJsFile('jquery.tablednd.js');
+      $this->AddJsFile('jquery.ui.packed.js');
       $this->AddJsFile('messages.js');
       $this->Title(T('Messages'));
          
@@ -121,11 +121,13 @@ class MessageController extends DashboardController {
    
    protected function _GetLocationData() {
       $ControllerData = array();
-      $ControllerData['Dashboard/Settings/Index'] = 'Dashboard';
+      $ControllerData['[Base]'] = 'Every Page';
+      $ControllerData['[NonAdmin]'] = 'Only Forum Pages';
+      $ControllerData['[Admin]'] = 'Only Dashboard Pages';
       $ControllerData['Dashboard/Profile/Index'] = 'Profile Page';
       $ControllerData['Vanilla/Discussions/Index'] = 'Discussions Page';
       $ControllerData['Vanilla/Discussion/Index'] = 'Comments Page';
-      $ControllerData['Base'] = 'Every Page';
+      $ControllerData['Dashboard/Settings/Index'] = 'Dashboard Home';
       $this->EventArguments['ControllerData'] = &$ControllerData;
       $this->FireEvent('AfterGetLocationData');
       return $ControllerData;

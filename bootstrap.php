@@ -30,6 +30,8 @@ require_once(PATH_LIBRARY_CORE . DS . 'interface.iplugin.php');
 require_once(PATH_LIBRARY_CORE . DS . 'interface.isingleton.php');
 require_once(PATH_LIBRARY_CORE . DS . 'interface.imodule.php');
 
+require_once(PATH_LIBRARY_CORE . DS . 'class.sliceprovider.php');
+require_once(PATH_LIBRARY_CORE . DS . 'class.plugin.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.pluggable.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.authenticator.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.controller.php');
@@ -45,6 +47,10 @@ require_once(PATH_LIBRARY_CORE . DS . 'class.schema.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.session.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.url.php');
 require_once(PATH_LIBRARY_CORE . DS . 'class.validation.php');
+
+require_once(PATH_LIBRARY_CORE . DS . 'class.cache.php');
+require_once(PATH_LIBRARY_CORE . DS . 'class.dirtycache.php');
+require_once(PATH_LIBRARY_CORE . DS . 'class.filecache.php');
 
 /// Include the core Gdn object.
 require_once(PATH_LIBRARY_CORE . DS . 'class.gdn.php');
@@ -64,7 +70,10 @@ $Gdn_Config->Load(PATH_CONF.DS.'config-defaults.php', 'Use');
 // Load the custom configurations so that we know what apps are enabled.
 $Gdn_Config->Load(PATH_CONF.DS.'config.php', 'Use');
 
-header('X-Garden-Version: '.APPLICATION.' '.APPLICATION_VERSION);
+// This header is redundantly set in the controller.
+//header('X-Garden-Version: '.APPLICATION.' '.APPLICATION_VERSION);
+
+Gdn::FactoryInstall(Gdn::AliasCache, 'Gdn_Cache', CombinePaths(array(PATH_LIBRARY_CORE,'class.cache.php')), Gdn::FactoryRealSingleton, 'Initialize');
 
 // Default request object
 Gdn::FactoryInstall(Gdn::AliasRequest, 'Gdn_Request', PATH_LIBRARY.DS.'core'.DS.'class.request.php', Gdn::FactoryRealSingleton, 'Create');
@@ -108,6 +117,7 @@ Gdn::FactoryInstall('Smarty', 'Smarty', PATH_LIBRARY.DS.'vendors'.DS.'Smarty-2.6
 Gdn::FactoryInstall('ViewHandler.tpl', 'Gdn_Smarty', PATH_LIBRARY_CORE.DS.'class.smarty.php', Gdn::FactorySingleton);
 // Application manager.
 Gdn::FactoryInstall('ApplicationManager', 'Gdn_ApplicationManager', PATH_LIBRARY_CORE.DS.'class.applicationmanager.php', Gdn::FactorySingleton);
+
 // Theme manager
 Gdn::FactoryInstall('ThemeManager', 'Gdn_ThemeManager', PATH_LIBRARY_CORE.DS.'class.thememanager.php', Gdn::FactoryInstance);
 Gdn::FactoryInstall(Gdn::AliasSlice, 'Gdn_Slice', PATH_LIBRARY_CORE.DS.'class.slice.php', Gdn::FactorySingleton);
@@ -116,8 +126,10 @@ Gdn::FactoryInstall(Gdn::AliasSlice, 'Gdn_Slice', PATH_LIBRARY_CORE.DS.'class.sl
 Gdn::FactoryInstall('Dummy', 'Gdn_Dummy', PATH_LIBRARY_CORE.DS.'class.dummy.php', Gdn::FactorySingleton);
 if(!Gdn::FactoryExists(Gdn::AliasLocale)) {
 	require_once(PATH_LIBRARY_CORE.DS.'class.locale.php');
-	$CurrentLocale = Gdn::Config('Garden.Locale', 'en-CA');
-	setlocale(LC_ALL, str_replace('-', '_', $CurrentLocale));
+	$Codeset = Gdn::Config('Garden.LocaleCodeset', 'UTF8');
+	$CurrentLocale = Gdn::Config('Garden.Locale', 'en-CA'); 
+	$SetLocale = str_replace('-', '_', $CurrentLocale).'.'.$Codeset;
+	setlocale(LC_ALL, $SetLocale);
 	$Gdn_Locale = new Gdn_Locale($CurrentLocale, Gdn::Config('EnabledApplications'), Gdn::Config('EnabledPlugins'));
 	Gdn::FactoryInstall(Gdn::AliasLocale, 'Gdn_Locale', PATH_LIBRARY_CORE.DS.'class.locale.php', Gdn::FactorySingleton, $Gdn_Locale);
 	unset($Gdn_Locale);
@@ -149,12 +161,8 @@ if (file_exists($ThemeHooks))
 // Set up the plugin manager (doing this early so it has fewer classes to
 // examine to determine if they are plugins).
 Gdn::FactoryInstall(Gdn::AliasPluginManager, 'Gdn_PluginManager', PATH_LIBRARY . DS . 'core' . DS . 'class.pluginmanager.php', Gdn::FactorySingleton);
-$PluginManager = Gdn::Factory(Gdn::AliasPluginManager);
-$PluginInfo = $PluginManager->IncludePlugins();
-$PluginManager->EnabledPlugins = $PluginInfo;
-$PluginManager->RegisterPlugins();
-unset($EnabledPlugins);
-unset($PluginInfo);
+Gdn::PluginManager()->IncludePlugins();
+Gdn::PluginManager()->RegisterPlugins();
 
 Gdn::FactoryOverwrite($FactoryOverwriteBak);
 unset($FactoryOverwriteBak);

@@ -9,13 +9,14 @@ Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
 */
 
 /**
- * Allows views to implement slices, small asynchronously refershable portions of the page
+ * Allows views to implement slices, small asynchronously refreshable portions of the page
  *
  * @author Tim Gunter
  * @package Garden
  * @version @@GARDEN-VERSION@@
  * @namespace Garden.Core
  */
+ 
 class Gdn_Slice {
 
    protected $Dispatcher;
@@ -29,11 +30,9 @@ class Gdn_Slice {
 
    public function Execute() {
       $SliceArgs = func_get_args();
-      // strURI
-      // strController + strMethod
       switch (count($SliceArgs)) {
          case 1:
-            
+            //die('slice request: '.$SliceArgs[0]);
             $Request = Gdn::Request()->Create()
                ->FromEnvironment()
                ->WithURI($SliceArgs[0])

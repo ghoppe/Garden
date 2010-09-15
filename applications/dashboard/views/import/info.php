@@ -1,7 +1,7 @@
 <?php if (!defined('APPLICATION')) exit();
 $this->AddSideMenu();
 ?>
-<h2><?php echo T('Import'); ?></h2>
+<h1><?php echo T('Import'); ?></h1>
 <?php
 $CurrentStep = GetValue('CurrentStep', $this->Data, 0);
 $Complete = FALSE;
@@ -21,6 +21,7 @@ Please review the information below and click <b>Start Import</b> to begin the i
          T('Garden.Import.Complete.Description', 'You have successfully completed an import.
    Click <b>Finished</b> when you are ready.'),
          '</div>';
+      echo Gdn::Slice('/dashboard/role/defaultroleswarning');
    } else {
       // The import is in process.
       echo '<div class="Info">',

@@ -6,12 +6,15 @@ jQuery(document).ready(function($) {
       
       var url = $(this).attr('href');
       var urlParts = url.split('/');
-      var addonType = urlParts[urlParts.length - 3];
+      var addonType = urlParts[urlParts.length - 4];
       if (addonType == 'plugins')
          addonType = 'Plugin';
       else if (addonType == 'applications')
          addonType = 'Application';
       else if (addonType == 'themes')
+         addonType = 'Theme';
+      
+      if ($(this).hasClass('EnableTheme'))
          addonType = 'Theme';
          
       if (addonType != 'Theme') {
@@ -21,7 +24,7 @@ jQuery(document).ready(function($) {
       var addonName = urlParts[urlParts.length - 2];
       var testUrl = gdn.combinePaths(
          gdn.definition('WebRoot'),
-         'index.php?/dashboard/settings/testaddon/'+addonType+'/'+addonName+'/'+gdn.definition('TransientKey')+'&DeliveryType=JSON'
+         'index.php?p=/dashboard/settings/testaddon/'+addonType+'/'+addonName+'/'+gdn.definition('TransientKey')+'&DeliveryType=JSON'
       );
       
       $.ajax({
@@ -67,7 +70,7 @@ jQuery(document).ready(function($) {
       var addonName = urlParts[urlParts.length - 1];
       var testUrl = gdn.combinePaths(
          gdn.definition('WebRoot'),
-         'index.php?/dashboard/settings/testaddon/Theme/'+addonName+'/'+gdn.definition('TransientKey')+'&DeliveryType=JSON'
+         'index.php?p=/dashboard/settings/testaddon/Theme/'+addonName+'/'+gdn.definition('TransientKey')+'&DeliveryType=JSON'
       );
       
       $.ajax({
@@ -89,4 +92,21 @@ jQuery(document).ready(function($) {
       return false;
    });
 
+   // Selection for theme styles.
+   $('a.SelectThemeStyle').click(function(e) {
+      e.preventDefault();
+
+      var key = $(this).attr('key');
+
+      // Deselect the current item.
+      $('table.ThemeStyles td').removeClass('Active');
+
+      // Select the new item.
+      $(this).parents('td').addClass('Active');
+      $('#Form_StyleKey').val(key);
+      $(this).parents('form').submit();
+
+      // $(this).blur();
+      return false;
+   });
 });

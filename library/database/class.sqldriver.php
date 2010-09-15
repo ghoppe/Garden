@@ -1087,7 +1087,7 @@ abstract class Gdn_SQLDriver {
     * @param array $Where The columns to find the row to update.
     * If a row is not found then one is inserted and the items in this array are merged with $Set.
     */
-   public function Replace($Table = '', $Set = NULL, $Where) {
+   public function Replace($Table = '', $Set = NULL, $Where, $CheckExisting = FALSE) {
       if(count($this->_Sets) > 0) {
          foreach($this->_Sets as $Key => $Value) {
             if(array_key_exists($Value, $this->_NamedParameters)) {
@@ -1101,8 +1101,31 @@ abstract class Gdn_SQLDriver {
       }
       
       // Check to see if there is a row in the table like this.
-      $Count = $this->GetCount($Table, $Where);
-      if($Count > 0) {
+      if ($CheckExisting) {
+         $Row = $this->GetWhere($Table, $Where)->FirstRow(DATASET_TYPE_ARRAY);
+         
+         $Update = FALSE;
+         if ($Row) {
+            foreach ($Set as $Key => $Value) {
+               $Key = trim($Key, '`');
+
+               if (in_array($Key, array('DateInserted', 'InsertUserID', 'DateUpdated', 'UpdateUserID')))
+                  continue;
+
+               if ($Row[$Key] != $Value) {
+                  $Update = TRUE;
+                  break;
+               }
+            }
+            if (!$Update)
+               return;
+         }
+      } else {
+         $Count = $this->GetCount($Table, $Where);
+         $Update = $Count > 0;
+      }
+
+      if($Update) {
          // Update the table.
          $this->Put($Table, $Set, $Where);
       } else {
@@ -1307,8 +1330,10 @@ abstract class Gdn_SQLDriver {
     * @param string $Direction The direction of the sort.
     */
    public function OrderBy($Fields, $Direction = 'asc') {
-      if ($Direction != 'asc')
+      if ($Direction && $Direction != 'asc')
          $Direction = 'desc';
+      else
+         $Direction = 'asc';
 
       $this->_OrderBys[] = $this->EscapeIdentifier($Fields, TRUE).' '.$Direction;
       return $this;
@@ -1516,6 +1541,11 @@ abstract class Gdn_SQLDriver {
    }
    
    public function Query($Sql, $Type = 'select') {
+      switch ($Type) {
+         case 'insert': $ReturnType = 'ID'; break;
+         default: $ReturnType = 'DataSet'; break;
+      }
+
       try {
          if ($this->CaptureModifications && strtolower($Type) != 'select') {
             if(!property_exists($this->Database, 'CapturedSql'))
@@ -1527,7 +1557,7 @@ abstract class Gdn_SQLDriver {
             return TRUE;
          }
 
-         $Result = $this->Database->Query($Sql, $this->_NamedParameters);
+         $Result = $this->Database->Query($Sql, $this->_NamedParameters, array('ReturnType' => $ReturnType));
       } catch (Exception $Ex) {
          $this->Reset();
          throw $Ex;

@@ -25,6 +25,8 @@ class CategoriesController extends VanillaController {
     * Show all discussions in a particular category.
     */
    public function Index($CategoryIdentifier = '', $Offset = '0') {
+      list($Offset, $Limit) = OffsetLimit($Offset, Gdn::Config('Vanilla.Discussions.PerPage', 30));
+      
       if (!is_numeric($CategoryIdentifier))
          $Category = $this->CategoryModel->GetFullByUrlCode(urldecode($CategoryIdentifier));
       else
@@ -40,9 +42,9 @@ class CategoriesController extends VanillaController {
          $this->Head->Title($Category->Name);
          $this->AddJsFile('discussions.js');
          $this->AddJsFile('bookmark.js');
-			$this->AddJsFile('js/library/jquery.menu.js');
+			$this->AddJsFile('jquery.menu.js');
          $this->AddJsFile('options.js');
-         $this->AddJsFile('/js/library/jquery.gardenmorepager.js');
+         $this->AddJsFile('jquery.gardenmorepager.js');
          $this->Head->AddRss($this->SelfUrl.'/feed.rss', $this->Head->Title());
       }
       if (!is_numeric($Offset) || $Offset < 0)
@@ -58,13 +60,14 @@ class CategoriesController extends VanillaController {
       $BookmarkedModule->GetData();
       $this->AddModule($BookmarkedModule);
    
-      $Limit = Gdn::Config('Vanilla.Discussions.PerPage', 30);
       $DiscussionModel = new DiscussionModel();
       $Wheres = array('d.CategoryID' => $this->CategoryID);
       
       $this->Permission('Vanilla.Discussions.View', TRUE, 'Category', $this->CategoryID);
       $CountDiscussions = $DiscussionModel->GetCount($Wheres);
       $this->SetData('CountDiscussions', $CountDiscussions);
+      $AnnounceData = $Offset == 0 ? $DiscussionModel->GetAnnouncements($Wheres) : new Gdn_DataSet();
+      $this->SetData('AnnounceData', $AnnounceData, TRUE   );
       $this->SetData('DiscussionData', $DiscussionModel->Get($Offset, $Limit, $Wheres), TRUE);
 
       // Build a pager
@@ -77,6 +80,9 @@ class CategoriesController extends VanillaController {
          $CountDiscussions,
          'categories/'.$CategoryIdentifier.'/%1$s'
       );
+
+      // Set the canonical Url.
+      $this->CanonicalUrl(Url(ConcatSep('/', 'categories/'.$CategoryIdentifier, PageNumber($Offset, $Limit, TRUE)), TRUE));
       
       // Change the controller name so that it knows to grab the discussion views
       $this->ControllerName = 'DiscussionsController';
@@ -100,9 +106,9 @@ class CategoriesController extends VanillaController {
    public function All() {
       $this->AddCssFile('vanilla.css');
       $this->Menu->HighlightRoute('/discussions');
-      $this->AddJsFile('discussions.js');
       $this->AddJsFile('bookmark.js');
-   	$this->AddJsFile('js/library/jquery.menu.js');
+      $this->AddJsFile('discussions.js');
+      $this->AddJsFile('jquery.menu.js');
       $this->AddJsFile('options.js');
       $this->Title(T('All Categories'));
          

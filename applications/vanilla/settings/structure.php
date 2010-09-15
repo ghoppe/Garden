@@ -28,17 +28,27 @@ if ($Drop)
    $SQL->Insert('Category', array('InsertUserID' => 1, 'UpdateUserID' => 1, 'DateInserted' => Gdn_Format::ToDateTime(), 'DateUpdated' => Gdn_Format::ToDateTime(), 'Name' => 'General', 'UrlCode' => 'general', 'Description' => 'General discussions', 'Sort' => '1'));
 
 // Construct the discussion table.
-$Construct->Table('Discussion')
+$Construct->Table('Discussion');
+
+$FirstCommentIDExists = $Construct->ColumnExists('FirstCommentID');
+$BodyExists = $Construct->ColumnExists('Body');
+$LastCommentIDExists = $Construct->ColumnExists('LastCommentID');
+$LastCommentUserIDExists = $Construct->ColumnExists('LastCommentUserID');
+$CountBookmarksExists = $Construct->ColumnExists('CountBookmarks');
+
+$Construct
    ->PrimaryKey('DiscussionID')
    ->Column('CategoryID', 'int', FALSE, 'key')
    ->Column('InsertUserID', 'int', FALSE, 'key')
    ->Column('UpdateUserID', 'int')
-	->Column('FirstCommentID', 'int', TRUE, 'key')	// Deleted April 26, 2010
    ->Column('LastCommentID', 'int', TRUE)
    ->Column('Name', 'varchar(100)', FALSE, 'fulltext')
 	->Column('Body', 'text', FALSE, 'fulltext')
 	->Column('Format', 'varchar(20)', TRUE)
+   ->Column('Tags', 'varchar(255)', NULL)
    ->Column('CountComments', 'int', '1')
+   ->Column('CountBookmarks', 'int', NULL)
+   ->Column('CountViews', 'int', '1')
    ->Column('Closed', 'tinyint(1)', '0')
    ->Column('Announce', 'tinyint(1)', '0')
    ->Column('Sink', 'tinyint(1)', '0')
@@ -55,7 +65,8 @@ $Construct->Table('Discussion')
 // Column($Name, $Type, $Length = '', $Null = FALSE, $Default = NULL, $KeyType = FALSE, $AutoIncrement = FALSE)
 $Construct->Table('UserDiscussion')
    ->Column('UserID', 'int', FALSE, 'primary')
-   ->Column('DiscussionID', 'int', FALSE, 'primary')
+   ->Column('DiscussionID', 'int', FALSE, array('primary', 'key'))
+	->Column('Score', 'float', NULL)
    ->Column('CountComments', 'int', '0')
    ->Column('DateLastViewed', 'datetime', NULL) // null signals never
    ->Column('Dismissed', 'tinyint(1)', '0') // relates to dismissed announcements
@@ -80,11 +91,12 @@ $Construct->Table('Comment')
 	->Engine('MyISAM')
 	->Set($Explicit, $Drop);
 
-// Allows the tracking of already-read comments on a per-user basis.
-$Construct->Table('CommentWatch')
+// Allows the tracking of already-read comments & votes on a per-user basis.
+$Construct->Table('UserComment')
    ->Column('UserID', 'int', FALSE, 'primary')
    ->Column('CommentID', 'int', FALSE, 'primary')
-   ->Column('DateLastViewed', 'datetime')
+   ->Column('Score', 'float', NULL)
+   ->Column('DateLastViewed', 'datetime', NULL) // null signals never
    ->Set($Explicit, $Drop);
    
 // Add extra columns to user table for tracking discussions & comments
@@ -103,6 +115,7 @@ $Construct->Table('Draft')
    ->Column('InsertUserID', 'int', FALSE, 'key')
    ->Column('UpdateUserID', 'int')
    ->Column('Name', 'varchar(100)', TRUE)
+   ->Column('Tags', 'varchar(255)', NULL)
    ->Column('Closed', 'tinyint(1)', '0')
    ->Column('Announce', 'tinyint(1)', '0')
    ->Column('Sink', 'tinyint(1)', '0')
@@ -242,6 +255,23 @@ if ($Drop) {
       'Vanilla.Comments.Edit' => 1,
       'Vanilla.Comments.Delete' => 1
       ), TRUE);
+
+   $PermissionModel->Save(array(
+      'RoleID' => 32,
+      'JunctionTable' => 'Category',
+      'JunctionColumn' => 'CategoryID',
+      'JunctionID' => $GeneralCategoryID,
+      'Vanilla.Discussions.Add' => 1,
+      'Vanilla.Discussions.Edit' => 1,
+      'Vanilla.Discussions.Announce' => 1,
+      'Vanilla.Discussions.Sink' => 1,
+      'Vanilla.Discussions.Close' => 1,
+      'Vanilla.Discussions.Delete' => 1,
+      'Vanilla.Discussions.View' => 1,
+      'Vanilla.Comments.Add' => 1,
+      'Vanilla.Comments.Edit' => 1,
+      'Vanilla.Comments.Delete' => 1
+      ), TRUE);
    
    // Make sure that User.Permissions is blank so new permissions for users get applied.
    $SQL->Update('User', array('Permissions' => ''))->Put();
@@ -254,30 +284,45 @@ Removed FirstComment from :_Discussion and moved it into the discussion table.
 */
 $Prefix = $SQL->Database->DatabasePrefix;
 
-$Construct->Query("update {$Prefix}Discussion, {$Prefix}Comment
-set {$Prefix}Discussion.Body = {$Prefix}Comment.Body,
-   {$Prefix}Discussion.Format = {$Prefix}Comment.Format
-where {$Prefix}Discussion.FirstCommentID = {$Prefix}Comment.CommentID");
+if ($FirstCommentIDExists && !$BodyExists) {
+   $Construct->Query("update {$Prefix}Discussion, {$Prefix}Comment
+   set {$Prefix}Discussion.Body = {$Prefix}Comment.Body,
+      {$Prefix}Discussion.Format = {$Prefix}Comment.Format
+   where {$Prefix}Discussion.FirstCommentID = {$Prefix}Comment.CommentID");
+
+   $Construct->Query("delete {$Prefix}Comment
+   from {$Prefix}Comment inner join {$Prefix}Discussion
+   where {$Prefix}Comment.CommentID = {$Prefix}Discussion.FirstCommentID");
+}
+
+if (!$LastCommentIDExists || !$LastCommentUserIDExists) {
+   $Construct->Query("update {$Prefix}Discussion d
+   inner join {$Prefix}Comment c
+      on c.DiscussionID = d.DiscussionID
+   inner join (
+      select max(c2.CommentID) as CommentID
+      from {$Prefix}Comment c2
+      group by c2.DiscussionID
+   ) c2
+   on c.CommentID = c2.CommentID
+   set d.LastCommentID = c.CommentID,
+      d.LastCommentUserID = c.InsertUserID
+where d.LastCommentUserID is null");
+}
+
+if (!$CountBookmarksExists) {
+   $Construct->Query("update {$Prefix}Discussion d
+   set CountBookmarks = (
+      select count(ud.DiscussionID)
+      from {$Prefix}UserDiscussion ud
+      where ud.Bookmarked = 1
+         and ud.DiscussionID = d.DiscussionID
+   )");
+}
 
 // Update lastcommentid & firstcommentid
-$Construct->Query("update {$Prefix}Discussion set LastCommentID = null where LastCommentID = FirstCommentID");
-
-$Construct->Query("delete {$Prefix}Comment
-from {$Prefix}Comment inner join {$Prefix}Discussion
-where {$Prefix}Comment.CommentID = {$Prefix}Discussion.FirstCommentID");
-
-$Construct->Query("update {$Prefix}Discussion d
-inner join {$Prefix}Comment c
-   on c.DiscussionID = d.DiscussionID
-inner join (
-   select max(c2.CommentID) as CommentID
-   from {$Prefix}Comment c2
-   group by c2.DiscussionID
-) c2
-on c.CommentID = c2.CommentID
-set d.LastCommentID = c.CommentID,
-   d.LastCommentUserID = c.InsertUserID
-where d.LastCommentUserID is null");
+if ($FirstCommentIDExists)
+   $Construct->Query("update {$Prefix}Discussion set LastCommentID = null where LastCommentID = FirstCommentID");
 
 /*
     May 12th, 2010
@@ -304,6 +349,17 @@ $Construct->Query("update {$Prefix}Permission p2
       p.`Vanilla.Comments.Delete` = p2.`Vanilla.Discussions.Sink`
    where p.RoleID <> 0;");
 
-// This is the final structure of the discussion table after removed & updated columns
-$Construct->Table('Discussion')->DropColumn('FirstCommentID');
-$Construct->Reset();
+// This is the final structure of the discussion table after removed & updated columns.
+if ($FirstCommentIDExists) {
+   $Construct->Table('Discussion')->DropColumn('FirstCommentID');
+   $Construct->Reset();
+}
+
+$Construct->Table('TagDiscussion')
+   ->Column('TagID', 'int', FALSE, 'primary')
+   ->Column('DiscussionID', 'int', FALSE, 'primary')
+   ->Set($Explicit, $Drop);
+
+$Construct->Table('Tag')
+   ->Column('CountDiscussions', 'int', 0)
+   ->Set();

@@ -21,6 +21,11 @@ Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
  */
 
 class Gdn_FileSystem {
+
+   const O_CREATE = 1;
+   const O_WRITE = 2;
+   const O_READ = 4;
+
    /**
     * Searches the provided file path(s). Returns the first one it finds in the
     * filesystem.
@@ -194,7 +199,6 @@ class Gdn_FileSystem {
       $LibraryKey = str_replace('.', '__', $LibraryName);
       Gdn_LibraryMap::PrepareCache($MappingCacheName);
       $LibraryPath = Gdn_LibraryMap::GetCache($MappingCacheName, $LibraryKey);
-      
       if ($LibraryPath === NULL) {
          // $LibraryName wasn't contained in the mappings array.
          // I need to look through the folders in this application for the requested file.
@@ -249,7 +253,7 @@ class Gdn_FileSystem {
     * @param string $FileName The full path and name of the file to be saved.
     * @param string $FileContents The contents of the file being saved.
     */
-   public static function SaveFile($FileName, $FileContents) {
+   public static function SaveFile($FileName, $FileContents, $Flags = LOCK_EX) {
    
       // Check that the folder exists and is writable
       $DirName = dirname($FileName);
@@ -260,7 +264,7 @@ class Gdn_FileSystem {
       if (!IsWritable($DirName))
          throw new Exception(sprintf('Requested save operation [%1$s] could not be completed because target folder [%2$s] is not writable.',$FileBaseName,$DirName));
          
-      file_put_contents($FileName, $FileContents);
+      file_put_contents($FileName, $FileContents, $Flags);
       return TRUE;
    }
    
@@ -272,7 +276,7 @@ class Gdn_FileSystem {
     */
    public static function Touch($FileName) {
       if (!file_exists($FileName))
-         file_put_contents($FileName, '');
+         file_put_contents($FileName, '', LOCK_EX);
    }
    
    /**
@@ -349,6 +353,11 @@ class Gdn_FileSystem {
     * @return void
     */
    public static function RemoveFolder($Dir) {
+      // Make sure the directory is properly denoted (otherwise this function
+      // will also delete directories prefixed with $Dir).
+      if (substr($Dir, -1, 1) != '/')
+         $Dir  .= '/';
+         
       $Files = glob($Dir . '*', GLOB_MARK);
       
       foreach ($Files as $File) {
@@ -360,4 +369,37 @@ class Gdn_FileSystem {
 
       if (is_dir($Dir)) rmdir($Dir);
    }
+   
+   public static function CheckFolderR($Path, $Flags = 0) {
+      $TrimPath = ltrim($Path, '/');
+      $PathParts = explode('/', $TrimPath);
+      $Prepend = (strlen($Path) !== strlen($TrimPath)) ? DS : '';
+      
+      $CurrentPath = array();
+      foreach ($PathParts as $FolderPart) {
+         array_push($CurrentPath, $FolderPart);
+         $TestFolder = $Prepend.implode(DS, $CurrentPath);
+         
+         if ($Flags & Gdn_FileSystem::O_CREATE) {
+            if (!is_dir($TestFolder))
+               @mkdir($TestFolder);
+         }
+         
+         if (!is_dir($TestFolder))
+            return FALSE;
+
+      }
+      
+      if ($Flags & Gdn_FileSystem::O_READ) {
+         if (!is_readable($Path))
+            return FALSE;
+      }
+         
+      if ($Flags & Gdn_FileSystem::O_WRITE) {
+         if (!is_writable($Path))
+            return FALSE;
+      }
+      return TRUE;
+   }
+   
 }

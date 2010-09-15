@@ -31,7 +31,6 @@ class SetupController extends DashboardController {
       $this->ApplicationFolder = 'dashboard';
       $this->MasterView = 'setup';
       // Fatal error if Garden has already been installed.
-      $Config = Gdn::Factory(Gdn::AliasConfig);
       
       $Installed = Gdn::Config('Garden.Installed') ? TRUE : FALSE;
       if ($Installed)
@@ -81,7 +80,6 @@ class SetupController extends DashboardController {
     * should not be functional after the application has been set up.
     */
    public function Configure($RedirectUrl = '') {
-      $Config = Gdn::Factory(Gdn::AliasConfig);
       
       // Create a model to save configuration settings
       $Validation = new Gdn_Validation();
@@ -148,25 +146,18 @@ class SetupController extends DashboardController {
             $Domain = Gdn::Request()->Domain();
 
             // Set up cookies now so that the user can be signed in.
-            $ConfigurationFormValues['Garden.Cookie.Salt'] = RandomString(10);
-            $ConfigurationFormValues['Garden.Cookie.Domain'] = strpos($Host, '.') === FALSE ? '' : $Host; // Don't assign the domain if it is a non .com domain as that will break cookies.
-            $ConfigurationModel->Save($ConfigurationFormValues);
-            
+            $ExistingSalt = C('Garden.Cookie.Salt', FALSE);
+            $ConfigurationFormValues['Garden.Cookie.Salt'] = ($ExistingSalt) ? $ExistingSalt : RandomString(10);
+            $ConfigurationFormValues['Garden.Cookie.Domain'] = ''; // Don't set this to anything by default. # Tim - 2010-06-23
+            $ConfigurationModel->Save($ConfigurationFormValues, TRUE);
+                    
             // If changing locale, redefine locale sources:
             $NewLocale = 'en-CA'; // $this->Form->GetFormValue('Garden.Locale', FALSE);
             if ($NewLocale !== FALSE && Gdn::Config('Garden.Locale') != $NewLocale) {
                $ApplicationManager = new Gdn_ApplicationManager();
-               $PluginManager = Gdn::Factory('PluginManager');
                $Locale = Gdn::Locale();
-               $Locale->Set($NewLocale, $ApplicationManager->EnabledApplicationFolders(), $PluginManager->EnabledPluginFolders(), TRUE);
+               $Locale->Set($NewLocale, $ApplicationManager->EnabledApplicationFolders(), Gdn::PluginManager()->EnabledPluginFolders(), TRUE);
             }
-            
-            // Set the instantiated config object's db params and make the database use them (otherwise it will use the default values from conf/config-defaults.php).
-            $Config->Set('Database.Host', $ConfigurationFormValues['Database.Host']);
-            $Config->Set('Database.Name', $ConfigurationFormValues['Database.Name']);
-            $Config->Set('Database.User', $ConfigurationFormValues['Database.User']);
-            $Config->Set('Database.Password', $ConfigurationFormValues['Database.Password']);
-            $Config->ClearSaveData();
             
             Gdn::FactoryInstall(Gdn::AliasDatabase, 'Gdn_Database', PATH_LIBRARY.DS.'database'.DS.'class.database.php', Gdn::FactorySingleton, array(Gdn::Config('Database')));
             
@@ -196,6 +187,7 @@ class SetupController extends DashboardController {
                $this->Form->SetValidationResults($UserModel->ValidationResults());
             } else {
                // The user has been created successfully, so sign in now
+               Gdn::Authenticator()->Identity()->Init();
                $Authenticator = Gdn::Authenticator()->AuthenticateWith('password');
                $Authenticator->FetchData($this->Form);
                $AuthUserID = $Authenticator->Authenticate();
@@ -210,8 +202,8 @@ class SetupController extends DashboardController {
             
             // Detect rewrite abilities
             try {
-               $Query = Gdn::Request()->Url("entry", TRUE);
-               $Results = ProxyHead($Query, array(), 1);
+               $Query = ConcatSep('/', Gdn::Request()->Domain(), Gdn::Request()->WebRoot(), 'dashboard/setup');
+               $Results = ProxyHead($Query, array(), 3);
                $CanRewrite = FALSE;
                if (in_array(ArrayValue('StatusCode',$Results,404), array(200,302)) && ArrayValue('X-Garden-Version',$Results,'None') != 'None') {
                   $CanRewrite = TRUE;
@@ -228,7 +220,7 @@ class SetupController extends DashboardController {
                //'Garden.Domain' => $Domain,
                'Garden.CanProcessImages' => function_exists('gd_info'),
                'EnabledPlugins.GettingStarted' => 'GettingStarted', // Make sure the getting started plugin is enabled
-               'EnabledPlugins.HTMLPurifier' => 'HtmlPurifier' // Make sure html purifier is enabled so html has a default way of being safely parsed
+               'EnabledPlugins.HtmLawed' => 'HtmLawed' // Make sure html purifier is enabled so html has a default way of being safely parsed.
             ));
          }
       }
@@ -247,18 +239,37 @@ class SetupController extends DashboardController {
       if (!defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY'))
          $this->Form->AddError(T('You must have the MySQL driver for PDO enabled in order for Vanilla to connect to your database.'));
 
+      // Make sure the user has copied the htaccess file over.
+      if (!file_exists(PATH_ROOT.'/.htaccess')) {
+         $this->Form->AddError(T('You are missing Vanilla\'s .htaccess file.', 'You are missing Vanilla\'s <b>.htaccess</b> file. Sometimes this file isn\'t copied if you are using ftp to upload your files because this file is hidden. Make sure you\'ve copy the <b>.htaccess</b> file before continuing.'));
+      }
+
       // Make sure that the correct filesystem permissions are in place
 		$PermissionProblem = FALSE;
-		$PermissionHelp = ' <p>Using your ftp client, or via command line, make sure that the following permissions are set for your vanilla installation:</p>
-<pre>chmod -R 777 '.CombinePaths(array(PATH_ROOT, 'conf')).'
-chmod -R 777 '.CombinePaths(array(PATH_ROOT, 'cache')).'
-chmod -R 777 '.CombinePaths(array(PATH_ROOT, 'uploads')).'</pre>';
+
+      // Make sure the appropriate folders are writeable.
+      $ProblemDirectories = array();
+      if (!is_readable(PATH_CONF) || !IsWritable(PATH_CONF))
+         $ProblemDirectories[] = CombinePaths(array(PATH_ROOT, 'conf'));
+      if (!is_readable(PATH_UPLOADS) || !IsWritable(PATH_UPLOADS))
+         $ProblemDirectories[] = CombinePaths(array(PATH_ROOT, 'uploads'));
+      if (!is_readable(PATH_CACHE) || !IsWritable(PATH_CACHE))
+         $ProblemDirectories[] = CombinePaths(array(PATH_ROOT, 'cache'));
+
+      if (count($ProblemDirectories) > 0) {
+         $PermissionProblem = TRUE;
+         
+         $PermissionError = T(
+            'Some folders don\'t have correct permissions.',
+            '<p>Some of your folders do not have the correct permissions.</p><p>Using your ftp client, or via command line, make sure that the following permissions are set for your vanilla installation:</p>');
+
+         $PermissionHelp = '<pre>chmod -R 777 '.implode("\nchmod -R 777 ", $ProblemDirectories).'</pre>';
+
+         $this->Form->AddError($PermissionError.$PermissionHelp);
+      }
       
       // Make sure the config folder is writeable
-      if (!is_readable(PATH_CONF) || !IsWritable(PATH_CONF)) {
-         $this->Form->AddError(T('Your configuration folder does not have the correct permissions. PHP needs to be able to read and write to this folder.'));
-			$PermissionProblem = TRUE;
-      } else {
+      if (!$PermissionProblem) {
          $ConfigFile = PATH_CONF . DS . 'config.php';
          if (!file_exists($ConfigFile))
             file_put_contents($ConfigFile, '');
@@ -269,26 +280,13 @@ chmod -R 777 '.CombinePaths(array(PATH_ROOT, 'uploads')).'</pre>';
 				$PermissionProblem = TRUE;
          }
       }
-      
-      $UploadsFolder = PATH_ROOT . DS . 'uploads';
-      if (!is_readable($UploadsFolder) || !IsWritable($UploadsFolder)) {
-         $this->Form->AddError(sprintf(T('Your uploads folder does not have the correct permissions. PHP needs to be able to read and write to this folder: <code>%s</code>'), $UploadsFolder));
-         $PermissionProblem = TRUE;
-      }
 
       // Make sure the cache folder is writeable
-      if (!is_readable(PATH_CACHE) || !IsWritable(PATH_CACHE)) {
-         $this->Form->AddError(sprintf(T('Your cache folder does not have the correct permissions. PHP needs to be able to read and write to this folder and all the files within: <code>%s</code>'), PATH_CACHE));
-         $PermissionProblem = TRUE;
-      } else {
-         if (!file_exists(PATH_CACHE.DS.'HtmlPurifier')) mkdir(PATH_CACHE.DS.'HtmlPurifier');
+      if (!$PermissionProblem) {
          if (!file_exists(PATH_CACHE.DS.'Smarty')) mkdir(PATH_CACHE.DS.'Smarty');
          if (!file_exists(PATH_CACHE.DS.'Smarty'.DS.'cache')) mkdir(PATH_CACHE.DS.'Smarty'.DS.'cache');
          if (!file_exists(PATH_CACHE.DS.'Smarty'.DS.'compile')) mkdir(PATH_CACHE.DS.'Smarty'.DS.'compile');
       }
-		
-		if ($PermissionProblem)
-			$this->Form->AddError($PermissionHelp);
 			
       return $this->Form->ErrorCount() == 0 ? TRUE : FALSE;
    }

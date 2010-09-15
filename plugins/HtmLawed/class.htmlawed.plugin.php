@@ -8,48 +8,48 @@ You should have received a copy of the GNU General Public License along with Gar
 Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
 */
 
-$PluginInfo['HTMLPurifier'] = array(
-   'Description' => 'Adapts HtmlPurifier to work with Garden.',
+$PluginInfo['HtmLawed'] = array(
+   'Description' => 'Adapts HtmLawed to work with Vanilla.',
    'Version' => '1.0',
-   'RequiredApplications' => NULL, 
-   'RequiredTheme' => FALSE, 
+   'RequiredApplications' => NULL,
+   'RequiredTheme' => FALSE,
    'RequiredPlugins' => FALSE,
    'HasLocale' => FALSE,
    'Author' => "Todd Burry",
    'AuthorEmail' => 'todd@vanillaforums.com',
-   'AuthorUrl' => 'http://toddburry.com'
+   'AuthorUrl' => 'http://vanillaforums.com/profile/todd'
 );
-require_once(PATH_LIBRARY.DS.'vendors'.DS.'htmlpurifier'.DS.'class.htmlpurifier.php');
 
-Gdn::FactoryInstall('HtmlFormatter', 'HTMLPurifierPlugin', __FILE__, Gdn::FactorySingleton);
+Gdn::FactoryInstall('HtmlFormatter', 'HTMLawedPlugin', __FILE__, Gdn::FactorySingleton);
 
-class HTMLPurifierPlugin extends Gdn_Plugin {
+class HTMLawedPlugin extends Gdn_Plugin {
 	/// CONSTRUCTOR ///
 	public function __construct() {
-		$HPConfig = HTMLPurifier_Config::createDefault();
-		$HPConfig->set('HTML.Doctype', 'XHTML 1.0 Strict');
-		// Get HtmlPurifier configuration settings from Garden
-		$HPSettings = Gdn::Config('HtmlPurifier');
-		if(is_array($HPSettings)) {
-			foreach ($HPSettings as $Namespace => $Setting) {
-				foreach ($Setting as $Name => $Value) {
-					// Assign them to htmlpurifier
-					$HPConfig->set($Namespace.'.'.$Name, $Value);
-				}
-			}
-		}
-		$this->_HtmlPurifier = new HTMLPurifier($HPConfig);
+      require_once(dirname(__FILE__).'/htmLawed/htmLawed.php');
 	}
-	
+
 	/// PROPERTIES ///
-	protected $_HtmlPurifier;
-	
+
 	/// METHODS ///
 	public function Format($Html) {
-		return $this->_HtmlPurifier->purify($Html);
+      $Config = array(
+       'anti_link_spam' => array('`.`', ''),
+       'comment' => 1,
+       'cdata' => 3,
+       'css_expression' => 1,
+       'deny_attribute' => 'on*',
+       'elements' => '*-applet-form-input-textarea-iframe-script-style', // object, embed allowed
+       'keep_bad' => 0,
+       'schemes' => 'classid:clsid; href: aim, feed, file, ftp, gopher, http, https, irc, mailto, news, nntp, sftp, ssh, telnet; style: nil; *:file, http, https', // clsid allowed in class
+       'valid_xml' => 2
+      );
+
+      $Result = htmLawed($Html, $Config,
+         'object=-classid-type, -codebase; embed=type(oneof=application/x-shockwave-flash)');
+      
+      return $Result;
 	}
-	
+
 	public function Setup() {
-		if (!file_exists(PATH_CACHE.DS.'HtmlPurifier')) mkdir(PATH_CACHE.DS.'HtmlPurifier');
 	}
 }

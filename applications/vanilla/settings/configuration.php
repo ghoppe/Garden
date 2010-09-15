@@ -15,8 +15,10 @@ $Configuration['Vanilla']['Discussion']['SpamCount']           = '3';
 $Configuration['Vanilla']['Discussion']['SpamTime']            = '60';
 $Configuration['Vanilla']['Discussion']['SpamLock']            = '120';
 
-$Configuration['Vanilla']['Comments']['PerPage']               = '100';
+$Configuration['Vanilla']['Comments']['PerPage']               = '50';
 $Configuration['Vanilla']['Discussions']['PerCategory']        = '5';
-$Configuration['Vanilla']['Discussions']['PerPage']            = '50';
+$Configuration['Vanilla']['Discussions']['PerPage']            = '30';
 $Configuration['Vanilla']['Discussions']['Home']               = 'discussions';
 $Configuration['Vanilla']['Categories']['Use']                 = TRUE;
+// Should users be automatically pushed to the last comment they read in a discussion?
+$Configuration['Vanilla']['Comments']['AutoOffset']            = TRUE;

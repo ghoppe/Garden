@@ -38,6 +38,8 @@ jQuery(document).ready(function($) {
                $.popup({}, XMLHttpRequest.responseText);
             },
             success: function(json) {
+               json = $.postParseJson(json);
+               
                // Remove any old errors from the form
                $(frm).find('div.Errors').remove();
 
@@ -87,7 +89,7 @@ jQuery(document).ready(function($) {
    // Enable multicomplete on selected inputs
    $('.MultiComplete').livequery(function() {
       $(this).autocomplete(
-         gdn.combinePaths(gdn.definition('WebRoot'), 'index.php?/dashboard/user/autocomplete/'),
+         gdn.combinePaths(gdn.definition('WebRoot'), 'index.php?p=/dashboard/user/autocomplete/'),
          {
             minChars: 1,
             multiple: true,

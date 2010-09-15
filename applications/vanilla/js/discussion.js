@@ -9,15 +9,13 @@ jQuery(document).ready(function($) {
 
    // Hijack the "Cancel" button on the comment form
    var cancelButton = $('a.Cancel');
-   var draftId = $('#Form_DraftID').val();
-   if (draftId == '')
-      cancelButton.hide();
       
    // Reveal it if they start typing a comment
+   /*
    $('div.CommentForm textarea').focus(function() {
       $('a.Cancel:hidden').show();
    });
-   
+   */
    // Hide it if they leave the area without typing
    $('div.CommentForm textarea').blur(function(ev) {
       var Comment = $(ev.target).val();
@@ -29,8 +27,8 @@ jQuery(document).ready(function($) {
    $('a.WriteButton, a.Cancel').livequery('click', function() {
       resetCommentForm(this);
       if ($(this).hasClass('Cancel'))
-         clearCommentForm(this);
-         
+         clearCommentForm(this);   
+
       return false;
    });
    
@@ -64,17 +62,20 @@ jQuery(document).ready(function($) {
       postValues += '&Type='+type;
       var discussionID = $(frm).find('[name$=DiscussionID]');
       var prefix = discussionID.attr('name').replace('DiscussionID', '');
-      var discussionID = discussionID.val();
+      discussionID = discussionID.val();
       // Get the last comment id on the page
       var comments = $('ul.Discussion li.Comment');
       var lastComment = $(comments).get(comments.length-1);
-      var lastCommentID = $(lastComment).attr('id').replace('Comment_', '').replace('Discussion_', '');
+      var lastCommentID = $(lastComment).attr('id');
+      lastCommentID = lastCommentID.indexOf('Discussion_') == 0 ? 0 : lastCommentID.replace('Comment_', '');
       postValues += '&' + prefix + 'LastCommentID=' + lastCommentID;
       var action = $(frm).attr('action') + '/' + discussionID;
-      $(frm).find(':submit').attr('disabled', 'disabled');            
+      $(frm).find(':submit').attr('disabled', 'disabled');
       $(parent).find('div.Tabs ul:first').after('<span class="TinyProgress">&nbsp;</span>');
       // Also add a spinner for comments being edited
       $(btn).parents('div.Comment').find('div.Meta span:last').after('<span class="TinyProgress">&nbsp;</span>');
+      
+      $(frm).triggerHandler('BeforeSubmit', [frm, btn]);
       $.ajax({
          type: "POST",
          url: action,
@@ -83,13 +84,49 @@ jQuery(document).ready(function($) {
          error: function(XMLHttpRequest, textStatus, errorThrown) {
             // Remove any old popups
             $('.Popup,.Overlay').remove();
-            $.popup({}, XMLHttpRequest.responseText);
+            var msg;
+            if (XMLHttpRequest.responseText)
+               msg = XMLHttpRequest.responseText;
+            else {
+               msg = '<h1>Error</h1><p class="Wrap">';
+               if(textStatus == 'timeout')
+                  msg += 'Your request took too long to complete and timed out. Please try again.';
+               else
+                  msg += textStatus;
+               msg += '</div>';
+            }
+
+
+            $.popup({}, msg);
          },
          success: function(json) {
+            json = $.postParseJson(json);
+            
+            var processedTargets = false;
+            // If there are targets, process them
+            if (json.Targets && json.Targets.length > 0) {
+               for(i = 0; i < json.Targets.length; i++) {
+                  if (json.Targets[i].Type != "Ajax") {
+                     json.Targets[i].Data = json.Data;
+                     processedTargets = true;
+                     break;
+                   }
+               }
+               gdn.processTargets(json.Targets);
+            }
+
+            // If there is a redirect url, go to it
+            if (json.RedirectUrl != null && jQuery.trim(json.RedirectUrl) != '') {
+               resetCommentForm(btn);
+               clearCommentForm(btn);
+               window.location.replace(json.RedirectUrl);
+               return false;
+            }
+
             // Remove any old popups if not saving as a draft
             if (!draft && json.FormSaved == true)
-               $('.Popup,.Overlay').remove();
-               
+               $('div.Popup,.Overlay').remove();
+
             var commentID = json.CommentID;
             
             // Assign the comment id to the form if it was defined
@@ -106,10 +143,8 @@ jQuery(document).ready(function($) {
                   
                $('ul#Menu li.MyDrafts a').html(json.MyDrafts);
             }
-
             // Remove any old errors from the form
             $(frm).find('div.Errors').remove();
-
             if (json.FormSaved == false) {
                $(frm).prepend(json.StatusMessage);
                json.StatusMessage = null;
@@ -121,29 +156,34 @@ jQuery(document).ready(function($) {
                
             } else if (!draft) {
                // Clean up the form
+               if (processedTargets)
+                  btn = $('div.CommentForm :submit');
+
                resetCommentForm(btn);
                clearCommentForm(btn);
 
                // If editing an existing comment, replace the appropriate row
                var existingCommentRow = $('#Comment_' + commentID);
-               if (existingCommentRow.length > 0) {
+               if (processedTargets) {
+                  // Don't do anything with the data b/c it's already been handled by processTargets
+               } else if (existingCommentRow.length > 0) {
                   existingCommentRow.after(json.Data).remove();
                   $('#Comment_' + commentID).effect("highlight", {}, "slow");
-               } else {   
+               } else {
                   gdn.definition('LastCommentID', commentID, true);
                   // If adding a new comment, show all new comments since the page last loaded, including the new one.
-                  $(json.Data).appendTo('ul.Discussion')
-                     .effect("highlight", {}, "slow");
+                  $(json.Data).appendTo('ul.Discussion');
+                  $('ul.Discussion li:last').effect("highlight", {}, "slow");
                }
-               
                // Remove any "More" pager links
                $('#PagerMore').remove();
-               
+
                // Let listeners know that the comment was added.
-               $(this).trigger('CommentAdded');
+               $(document).trigger('CommentAdded');
                $(frm).triggerHandler('complete');
             }
             gdn.inform(json.StatusMessage);
+            return false;
          },
          complete: function(XMLHttpRequest, textStatus) {
             // Remove any spinners, and re-enable buttons.
@@ -168,10 +208,7 @@ jQuery(document).ready(function($) {
    function clearCommentForm(sender) {
       var container = $(sender).parents('li.Editing');
       $(container).removeClass('Editing');
-      if (sender != null && $(sender).hasClass('Cancel'))
-         $(sender).hide();
-      
-      $('.Popup,.Overlay').remove();
+      $('div.Popup,.Overlay').remove();
       var frm = $(sender).parents('div.CommentForm');
       frm.find('textarea').val('');
       frm.find('input:hidden[name$=CommentID]').val('');
@@ -180,7 +217,7 @@ jQuery(document).ready(function($) {
       if (draftInp.val() != '')
          $.ajax({
             type: "POST",
-            url: gdn.combinePaths(gdn.definition('WebRoot'), 'index.php?/vanilla/drafts/delete/' + draftInp.val() + '/' + gdn.definition('TransientKey')),
+            url: gdn.combinePaths(gdn.definition('WebRoot'), 'index.php?p=/vanilla/drafts/delete/' + draftInp.val() + '/' + gdn.definition('TransientKey')),
             data: 'DeliveryType=BOOL&DeliveryMethod=JSON',
             dataType: 'json'
          });         
@@ -195,7 +232,7 @@ jQuery(document).ready(function($) {
    if ($.morepager)
       $('.MorePager').morepager({
          pageContainerSelector: 'ul.Discussion',
-         afterPageLoaded: function() { $(this).trigger('CommentPagingComplete'); }
+         afterPageLoaded: function() { $(document).trigger('CommentPagingComplete'); }
       });
       
    // Autosave comments
@@ -223,10 +260,12 @@ jQuery(document).ready(function($) {
             dataType: 'json',
             error: function(XMLHttpRequest, textStatus, errorThrown) {
                // Remove any old popups
-               $('.Popup,.Overlay').remove();
+               $('div.Popup,.Overlay').remove();
                $.popup({}, XMLHttpRequest.responseText);
             },
             success: function(json) {
+               json = $.postParseJson(json);
+               
                $(msg).after(json.Data);
                $(msg).hide();
                $(parent).find('span.TinyProgress').remove();
@@ -237,6 +276,8 @@ jQuery(document).ready(function($) {
          $(parent).find('span.TinyProgress').remove();
          $(msg).show();
       }
+      
+      $(document).trigger('CommentEditingComplete', [msg]);
       return false;
    });
    // Reveal the original message when cancelling an in-place edit.
@@ -274,14 +315,16 @@ jQuery(document).ready(function($) {
          
          $.ajax({
             type: "POST",
-            url: gdn.combinePaths(gdn.definition('WebRoot', ''), 'index.php?/discussion/getnew/' + discussionID + '/' + lastCommentID),
+            url: gdn.combinePaths(gdn.definition('WebRoot', ''), 'index.php?p=/discussion/getnew/' + discussionID + '/' + lastCommentID),
             data: "DeliveryType=ASSET&DeliveryMethod=JSON",
             dataType: "json",
             error: function(XMLHttpRequest, textStatus, errorThrown) {
                // Popup the error
                $.popup({}, XMLHttpRequest.responseText);
             },
-            success: function(json) {               
+            success: function(json) {
+               json = $.postParseJson(json);
+               
                if(json.Data && json.LastCommentID) {
                   gdn.definition('LastCommentID', json.LastCommentID, true);
                   $(json.Data).appendTo("ul.Discussion")

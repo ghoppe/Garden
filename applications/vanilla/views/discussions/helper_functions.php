@@ -6,7 +6,10 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
    $CssClass .= $Alt.' ';
    $CssClass .= $Discussion->Announce == '1' ? ' Announcement' : '';
    $CssClass .= $Discussion->InsertUserID == $Session->UserID ? ' Mine' : '';
-   $CountUnreadComments = $Discussion->CountUnreadComments;
+   $CountUnreadComments = 0;
+   if (is_numeric($Discussion->CountUnreadComments))
+      $CountUnreadComments = $Discussion->CountUnreadComments;
+      
    // Logic for incomplete comment count.
    if($Discussion->CountCommentWatch == 0 && $DateLastViewed = GetValue('DateLastViewed', $Discussion)) {
       if(Gdn_Format::ToTimestamp($DateLastViewed) >= Gdn_Format::ToTimestamp($Discussion->LastDate)) {
@@ -20,11 +23,23 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
    $Sender->EventArguments['Discussion'] = &$Discussion;
    $First = UserBuilder($Discussion, 'First');
    $Last = UserBuilder($Discussion, 'Last');
+   $DiscussionName = Gdn_Format::Text($Discussion->Name);
+   if ($DiscussionName == '')
+      $DiscussionName = T('Blank Discussion Topic');
+
+   static $FirstDiscussion = TRUE;
+   if (!$FirstDiscussion)
+      $Sender->FireEvent('BetweenDiscussion');
+   else
+      $FirstDiscussion = FALSE;
 ?>
 <li class="<?php echo $CssClass; ?>">
-   <?php WriteOptions($Discussion, $Sender, $Session); ?>
+   <?php
+   $Sender->FireEvent('BeforeDiscussionContent');
+   WriteOptions($Discussion, $Sender, $Session);
+   ?>
    <div class="ItemContent Discussion">
-      <?php echo Anchor(Gdn_Format::Text($Discussion->Name), '/discussion/'.$Discussion->DiscussionID.'/'.Gdn_Format::Url($Discussion->Name).($Discussion->CountCommentWatch > 0 ? '/#Item_'.$Discussion->CountCommentWatch : ''), 'Title'); ?>
+      <?php echo Anchor($DiscussionName, '/discussion/'.$Discussion->DiscussionID.'/'.Gdn_Format::Url($Discussion->Name).($Discussion->CountCommentWatch > 0 && C('Vanilla.Comments.AutoOffset') ? '/#Item_'.$Discussion->CountCommentWatch : ''), 'Title'); ?>
       <?php $Sender->FireEvent('AfterDiscussionTitle'); ?>
       <div class="Meta">
          <?php if ($Discussion->Announce == '1') { ?>
@@ -33,19 +48,28 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
          <?php if ($Discussion->Closed == '1') { ?>
          <span class="Closed"><?php echo T('Closed'); ?></span>
          <?php } ?>
-         <span><?php printf(Plural($Discussion->CountComments, '%s comment', '%s comments'), $Discussion->CountComments); ?></span>
+         <span class="CommentCount"><?php printf(Plural($Discussion->CountComments, '%s comment', '%s comments'), $Discussion->CountComments); ?></span>
          <?php
-            if ($CountUnreadComments > 0 || $CountUnreadComments === '' && $Session->IsValid())
-               echo '<strong>',trim(sprintf(T('%s new'), $CountUnreadComments)),'</strong>';
+            if ($Session->IsValid()) {
+               if ($CountUnreadComments == $Discussion->CountComments)
+                  echo '<strong>'.T('New').'</strong>';
+               else if ($CountUnreadComments > 0)
+                  echo '<strong>'.Plural($CountUnreadComments, '%s New', '%s New Plural').'</strong>';
+            }
+
+            if ($Discussion->LastCommentID != '') {
+               echo '<span class="LastCommentBy">'.sprintf(T('Most recent by %1$s'), UserAnchor($Last)).'</span>';
+               echo '<span class="LastCommentDate">'.Gdn_Format::Date($Discussion->LastDate).'</span>';
+            } else {
+               echo '<span class="LastCommentBy">'.sprintf(T('Started by %1$s'), UserAnchor($First)).'</span>';
+               echo '<span class="LastCommentDate">'.Gdn_Format::Date($Discussion->FirstDate).'</span>';
+            }
+         
+            if (C('Vanilla.Categories.Use'))
+               echo Wrap(Anchor($Discussion->Category, '/categories/'.$Discussion->CategoryUrlCode, 'Category'));
+               
+            $Sender->FireEvent('DiscussionMeta');
          ?>
-         <span><?php
-            if ($Discussion->LastCommentID != '')
-               printf(T('Most recent by %1$s %2$s'), UserAnchor($Last), Gdn_Format::Date($Discussion->LastDate));
-            else
-               printf(T('Started by %1$s %2$s'), UserAnchor($First), Gdn_Format::Date($Discussion->FirstDate));
-         ?></span>
-         <span><?php echo Anchor($Discussion->Category, '/categories/'.$Discussion->CategoryUrlCode, 'Category'); ?></span>
-         <?php $Sender->FireEvent('DiscussionMeta'); ?>
       </div>
    </div>
 </li>
@@ -78,10 +102,13 @@ function WriteFilterTabs(&$Sender) {
    ?>
 <div class="Tabs DiscussionsTabs">
    <ul>
+      <?php $Sender->FireEvent('BeforeDiscussionTabs'); ?>
       <li<?php echo strtolower($Sender->ControllerName) == 'discussionscontroller' && strtolower($Sender->RequestMethod) == 'index' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('All Discussions'), 'discussions'); ?></li>
+      <?php $Sender->FireEvent('AfterAllDiscussionsTab'); ?>
       <?php if ($CountBookmarks > 0 || $Sender->RequestMethod == 'bookmarked') { ?>
       <li<?php echo $Sender->RequestMethod == 'bookmarked' ? ' class="Active"' : ''; ?>><?php echo Anchor($Bookmarked, '/discussions/bookmarked', 'MyBookmarks'); ?></li>
       <?php
+         $Sender->FireEvent('AfterBookmarksTab');
       }
       if ($CountDiscussions > 0 || $Sender->RequestMethod == 'mine') {
       ?>
@@ -91,7 +118,10 @@ function WriteFilterTabs(&$Sender) {
       if ($CountDrafts > 0 || $Sender->ControllerName == 'draftscontroller') {
       ?>
       <li<?php echo $Sender->ControllerName == 'draftscontroller' ? ' class="Active"' : ''; ?>><?php echo Anchor($MyDrafts, '/drafts', 'MyDrafts'); ?></li>
-      <?php } ?>
+      <?php
+      }
+      $Sender->FireEvent('AfterDiscussionTabs');
+      ?>
    </ul>
    <?php
    if (property_exists($Sender, 'Category') && is_object($Sender->Category)) {

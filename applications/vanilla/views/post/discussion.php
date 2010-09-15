@@ -1,7 +1,7 @@
 <?php if (!defined('APPLICATION')) exit();
 $Session = Gdn::Session();
 $CancelUrl = '/vanilla/discussions';
-if (Gdn::Config('Vanilla.Categories.Use') === TRUE && $this->CategoryID > 0 && $this->CategoryData->NumRows() > 0) {
+if (C('Vanilla.Categories.Use') && $this->CategoryID > 0 && $this->CategoryData->NumRows() > 0) {
    foreach ($this->CategoryData->Result() as $Cat) {
       if ($Cat->CategoryID == $this->CategoryID) {
          $CancelUrl = '/vanilla/discussions/0/'.$Cat->CategoryID.'/'.Gdn_Format::Url($Cat->Name);
@@ -15,6 +15,8 @@ if (Gdn::Config('Vanilla.Categories.Use') === TRUE && $this->CategoryID > 0 && $
    <?php
       echo $this->Form->Open();
       echo $this->Form->Errors();
+      $this->FireEvent('BeforeFormInputs');
+      
       echo $this->Form->Label('Discussion Title', 'Name');
       echo $this->Form->TextBox('Name', array('maxlength' => 100));
       if (Gdn::Config('Vanilla.Categories.Use') === TRUE) {
@@ -36,9 +38,6 @@ if (Gdn::Config('Vanilla.Categories.Use') === TRUE && $this->CategoryID > 0 && $
       if ($Session->CheckPermission('Vanilla.Discussions.Close'))
          $Options .= '<li>'.$this->Form->CheckBox('Closed', T('Close this discussion'), array('value' => '1')).'</li>';
 
-      if ($Session->CheckPermission('Vanilla.Discussions.Sink'))
-         $Options .= '<li>'.$this->Form->CheckBox('Sink', T('Sink this discussion'), array('value' => '1')).'</li>';
-         
       if ($Options != '')
          echo '<ul class="PostOptions">' . $Options .'</ul>';
 

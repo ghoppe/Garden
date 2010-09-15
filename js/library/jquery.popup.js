@@ -51,11 +51,13 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
                    $.popup({}, XMLHttpRequest.responseText);
                 },
                 success: function(json) {
+                  json = $.postParseJson(json);
+                  
                   $.popup.close(settings);
                   settings.afterConfirm(json, settings.sender);
                   gdn.inform(json.StatusMessage);
                   if (json.RedirectUrl)
-                    setTimeout("document.location='" + json.RedirectUrl + "';", 300);
+                    setTimeout("document.location='" + gdn.url(json.RedirectUrl) + "';", 300);
 
                 }
              });
@@ -108,11 +110,9 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
   // Close a jquery popup and release escape key bindings
   $.popup.close = function(settings, response) {
-    $(document).unbind('keydown.popup')
+    $(document).unbind('keydown.popup');
+    $('#'+settings.popupId).trigger('popupClose');
     $('.Overlay').remove();
-    $('#'+settings.popupId).remove();
-    if (settings)
-      settings.onUnload(settings, response);
     
     return false;
   }
@@ -152,7 +152,13 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
       if (e.keyCode == 27)
         $.popup.close(settings);
     })    
-    
+
+    if (settings.onUnload) {
+      $('#'+settings.popupId).bind('popupClose',function(){
+          setTimeout(settings.onUnload,1);
+      });
+    }
+
     // Replace language definitions
     if (!settings.confirm) {
       $('#'+settings.popupId+' .Close').click(function() {
@@ -207,33 +213,33 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
     
     settings.afterLoad();
     
-    // Now, if there are any forms in the popup, hijack them if necessary.
-    if (settings.hijackForms == true) {
+   // Now, if there are any forms in the popup, hijack them if necessary.
+   if (settings.hijackForms == true) {
       $('#'+settings.popupId+' form').ajaxForm({
-        data: {
-          'DeliveryType' : settings.deliveryType,
-          'DeliveryMethod' : 'JSON'
-        },
-        dataType: 'json',
-        beforeSubmit: function() {
+          data: {
+             'DeliveryType' : settings.deliveryType,
+             'DeliveryMethod' : 'JSON'
+         },
+         dataType: 'json',
+         beforeSubmit: function() {
           settings.onSave(settings) // Notify the user that it is being saved.
-        },  
-        success: function(json) {
-          if (json.StatusMessage)
-             gdn.inform(json.StatusMessage);
-
-          if (json.FormSaved == true) {
-
-            if (json.RedirectUrl)
-              setTimeout("document.location='" + json.RedirectUrl + "';", 300);
+         },  
+         success: function(json) {
+            json = $.postParseJson(json);
+            
+            if (json.StatusMessage)
+               gdn.inform(json.StatusMessage);
+         
+            if (json.FormSaved == true) {
+               if (json.RedirectUrl)
+                  setTimeout("document.location='" + json.RedirectUrl + "';", 300);
               
-            settings.afterSuccess(settings, json);
-            $.popup.close(settings, json);
-              
-          } else {
-            $.popup.reveal(settings, json) // Setup the form again
-          }
-        }
+               settings.afterSuccess(settings, json);
+               $.popup.close(settings, json);
+            } else {
+               $.popup.reveal(settings, json) // Setup the form again
+            }
+         }
       });
     }
     
@@ -272,11 +278,13 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
     popupHtml:       '\
   <div class="Overlay"> \
     <div id="{popup.id}" class="Popup"> \
-      <div class="Body"> \
-        <div class="Content"> \
-        </div> \
-        <div class="Footer"> \
-          <a href="#" class="Close"><span>×</span></a> \
+      <div class="Border"> \
+        <div class="Body"> \
+          <div class="Content"> \
+          </div> \
+          <div class="Footer"> \
+            <a href="#" class="Close"><span>×</span></a> \
+          </div> \
         </div> \
       </div> \
     </div> \
@@ -284,11 +292,13 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
     confirmHtml:       '\
   <div class="Overlay"> \
     <div id="{popup.id}" class="Popup"> \
-      <div class="Body"> \
-        <div class="Content"><h1>Confirm</h1><p>Are you sure you want to do that?</p></div> \
-        <div class="Footer"> \
-          <input type="button" class="Button Okay" value="Okay" /> \
-          <input type="button" class="Button Cancel" value="Cancel" /> \
+      <div class="Border"> \
+        <div class="Body"> \
+          <div class="Content"><h1>Confirm</h1><p>Are you sure you want to do that?</p></div> \
+          <div class="Footer"> \
+            <input type="button" class="Button Okay" value="Okay" /> \
+            <input type="button" class="Button Cancel" value="Cancel" /> \
+          </div> \
         </div> \
       </div> \
     </div> \

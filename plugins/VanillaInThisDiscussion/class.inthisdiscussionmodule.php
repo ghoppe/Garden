@@ -23,14 +23,12 @@ class InThisDiscussionModule extends Gdn_Module {
    public function GetData($DiscussionID, $Limit = 50) {
       $SQL = Gdn::SQL();
       $this->_UserData = $SQL
-         ->Select('u.UserID, u.Name')
-         ->Select('p.Name', '', 'Photo')
+         ->Select('u.UserID, u.Name, u.Photo')
          ->Select('c.DateInserted', 'max', 'DateLastActive')
          ->From('User u')
-         ->Join('Photo p', 'u.PhotoID = p.PhotoID', 'left')
          ->Join('Comment c', 'u.UserID = c.InsertUserID')
          ->Where('c.DiscussionID', $DiscussionID)
-         ->GroupBy('u.UserID, u.Name, p.Name')
+         ->GroupBy('u.UserID, u.Name')
          ->OrderBy('u.Name', 'asc')
          ->Get();
    }
@@ -40,6 +38,9 @@ class InThisDiscussionModule extends Gdn_Module {
    }
 
    public function ToString() {
+      if ($this->_UserData->NumRows() == 0)
+         return '';
+      
       $String = '';
       ob_start();
       ?>

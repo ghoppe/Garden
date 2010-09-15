@@ -25,12 +25,8 @@ class Gdn_PagerFactory {
       $PagerType = $PagerType.'Module';
          
       if (!class_exists($PagerType))
-         __autoload($PagerType);
-         
-      if (!class_exists($PagerType)) {
          $PagerType = 'PagerModule';
-         __autoload($PagerType);
-      }
+
       if (!class_exists($PagerType))
          return FALSE;
 

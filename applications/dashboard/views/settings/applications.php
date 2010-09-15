@@ -17,7 +17,7 @@ $DisabledCount = $AppCount - $EnabledCount;
 </div>
 <div class="Tabs FilterTabs">
    <ul>
-      <li<?php echo $this->Filter == '' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('All '.Wrap($AppCount)), 'settings/applications/'); ?></li>
+      <li<?php echo $this->Filter == 'all' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('All '.Wrap($AppCount)), 'settings/applications/'); ?></li>
       <li<?php echo $this->Filter == 'enabled' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('Enabled '.Wrap($EnabledCount)), 'settings/applications/enabled'); ?></li>
       <li<?php echo $this->Filter == 'disabled' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('Disabled '.Wrap($DisabledCount)), 'settings/applications/disabled'); ?></li>
       <?php
@@ -45,7 +45,7 @@ $Alt = FALSE;
 foreach ($this->AvailableApplications as $AppName => $AppInfo) {
    $Css = array_key_exists($AppName, $this->EnabledApplications) ? 'Enabled' : 'Disabled';
    $State = strtolower($Css);
-   if ($this->Filter == '' || $this->Filter == $State) {
+   if ($this->Filter == 'all' || $this->Filter == $State) {
       $Alt = $Alt ? FALSE : TRUE;
       $Version = ArrayValue('Version', $AppInfo, '');
       $ScreenName = ArrayValue('Name', $AppInfo, $AppName);
@@ -67,13 +67,12 @@ foreach ($this->AvailableApplications as $AppName => $AppInfo) {
             $ToggleText = array_key_exists($AppName, $this->EnabledApplications) ? 'Disable' : 'Enable';
             echo Anchor(
                T($ToggleText),
-               '/settings/applications/'.$AppName.'/'.$Session->TransientKey(),
-               $ToggleText.'Addon'
+               '/settings/applications/'.$this->Filter.'/'.$AppName.'/'.$Session->TransientKey(),
+               $ToggleText.'Addon SmallButton'
             );
             
             if ($SettingsUrl != '') {
-               echo '<span>|</span>';
-               echo Anchor('Settings', $SettingsUrl);
+               echo Anchor('Settings', $SettingsUrl, 'SmallButton');
             }
          ?></td>
          <td class="Alt Info"><?php

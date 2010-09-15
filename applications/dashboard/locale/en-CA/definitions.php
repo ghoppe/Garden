@@ -22,7 +22,7 @@ if (!function_exists('FormatPossessive')) {
 
 if (!function_exists('Plural')) {
    function Plural($Number, $Singular, $Plural) {
-      return T($Number == 1 ? $Singular : $Plural);
+      return sprintf(T($Number == 1 ? $Singular : $Plural), $Number);
    }
 }
 
@@ -130,5 +130,6 @@ $Definition['Date.DefaultDayFormat'] = '%B %e';
 $Definition['Date.DefaultYearFormat'] = '%B %Y';
 $Definition['Date.DefaultTimeFormat'] = '%l:%M%p';
 $Definition['Saved'] = 'Your changes have been saved.';
+$Definition['%s New Plural'] = '%s New';
 
 // TODO: PROVIDE TRANSLATIONS FOR ALL CONFIGURATION SETTINGS THAT ARE EDITABLE ON ADMIN FORMS (ie. Vanilla.Comments.MaxLength, etc).

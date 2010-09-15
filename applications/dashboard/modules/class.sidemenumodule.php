@@ -16,6 +16,11 @@ if (!class_exists('SideMenuModule', FALSE)) {
    class SideMenuModule extends Gdn_Module {
       
       /**
+       * Should the group titles be autolinked to the first anchor in the group? Default TRUE;
+       */
+      public $AutoLinkGroups;
+      
+      /**
        * An array of menu items.
        */
       public $Items;
@@ -47,6 +52,7 @@ if (!class_exists('SideMenuModule', FALSE)) {
    
       public function __construct(&$Sender = '') {
          $this->HtmlId = 'SideMenu';
+         $this->AutoLinkGroups = TRUE;
          $this->ClearGroups();
          parent::__construct($Sender);
       }
@@ -100,7 +106,6 @@ if (!class_exists('SideMenuModule', FALSE)) {
       public function ToString($HighlightRoute = '') {
          if ($HighlightRoute == '')
             $HighlightRoute = $this->_HighlightRoute;
-            
          if ($HighlightRoute == '')
             $HighlightRoute = Gdn_Url::Request();
          
@@ -174,7 +179,7 @@ if (!class_exists('SideMenuModule', FALSE)) {
                      if ($Url !== FALSE) {
                         $Url = str_replace(array('{Username}', '{UserID}', '{Session_TransientKey}'), array(urlencode($Username), $UserID, $Session_TransientKey), $Link['Url']);
                         if (substr($Url, 0, 5) != 'http:') {
-                           if ($GroupAnchor == '')
+                           if ($GroupAnchor == '' && $this->AutoLinkGroups)
                               $GroupAnchor = $Url;
                               
                            $Url = Url($Url);
@@ -189,18 +194,26 @@ if (!class_exists('SideMenuModule', FALSE)) {
                            
                         $Group .= '<li'.Attribute($Attributes).'><a href="'.$Url.'">'.$Text.'</a>';
                         ++$LinkCount;
+                     }  else {
+                        $GroupAttributes = $Attributes;
+                        $GroupName = $Text;
                      }
                      ++$ItemCount;
                   }
                }
                if ($OpenGroup === TRUE) {
                   $Group .= "</li>\r\n</ul>\r\n";
-                  $Attributes = array();
+                  $GroupAttributes['class'] = 'Box Group '.GetValue('class', $GroupAttributes, '');
                   if ($GroupIsActive)
-                     $Attributes['class'] = 'Active';
+                     $GroupAttributes['class'] .= ' Active';
                      
-                  if ($GroupName != '')
-                     $Group = Wrap(Wrap(($GroupAnchor == '' ? $GroupName : Anchor($GroupName, $GroupAnchor)), 'h4', $Attributes).$Group, 'div', array('class' => 'Box Group'));
+                  if ($GroupName != '') {
+                     if ($LinkCount == 1)
+                        $Group = '';
+                        
+                     $GroupUrl = Url($GroupAnchor);
+                     $Group = Wrap(Wrap(($GroupAnchor == '' ? $GroupName : "<a href=\"$GroupUrl\">$GroupName</a>" /*Anchor($GroupName, $GroupAnchor)*/), 'h4').$Group, 'div', $GroupAttributes);
+                  }
                }
 
 

@@ -3,7 +3,11 @@ $Advanced = C('Garden.Roles.Manage');
 echo $this->Form->Open();
 ?>
 <h1><?php echo T('Manage Roles & Permissions'); ?></h1>
-<div class="Info"><?php echo T('Every user in your site is assigned to at least one role. Roles are used to determine what the users are allowed to do.'); ?></div>
+<?php $this->DefaultRolesWarning(); ?>
+<div class="Info"><?php
+   echo T('Every user in your site is assigned to at least one role. Roles are used to determine what the users are allowed to do.');
+   $this->FireEvent('AfterRolesInfo');
+?></div>
 <?php if ($Advanced) { ?>
 <div class="FilterMenu"><?php echo Anchor('Add Role', 'dashboard/role/add', 'SmallButton'); ?></div>
 <?php } ?>
@@ -26,13 +30,9 @@ foreach ($this->RoleData->Result() as $Role) {
          <?php if ($Advanced) { ?>
          <div>
             <?php
-            echo Anchor('Edit', '/role/edit/'.$Role->RoleID);
-            if ($Role->Deletable) {
-            ?>
-            <span>|</span>
-            <?php
-            echo Anchor('Delete', '/role/delete/'.$Role->RoleID, 'Popup');
-            }
+            echo Anchor('Edit', '/role/edit/'.$Role->RoleID, 'SmallButton');
+            if ($Role->Deletable)
+               echo Anchor('Delete', '/role/delete/'.$Role->RoleID, 'Popup SmallButton');
             ?>
          </div>
          <?php } ?>

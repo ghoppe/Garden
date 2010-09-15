@@ -27,7 +27,8 @@ class SettingsController extends Gdn_Controller {
          'Vanilla.Comments.PerPage',
          'Vanilla.Categories.Use',
          'Vanilla.Archive.Date',
-			'Vanilla.Archive.Exclude'
+			'Vanilla.Archive.Exclude',
+			'Garden.EditContentTimeout'
       ));
       
       // Set the model on the form.
@@ -45,6 +46,7 @@ class SettingsController extends Gdn_Controller {
          $ConfigurationModel->Validation->ApplyRule('Vanilla.Comments.PerPage', 'Required');
          $ConfigurationModel->Validation->ApplyRule('Vanilla.Comments.PerPage', 'Integer');
          $ConfigurationModel->Validation->ApplyRule('Vanilla.Archive.Date', 'Date');
+			$ConfigurationModel->Validation->ApplyRule('Garden.EditContentTimeout', 'Integer');
 			
 			// Grab old config values to check for an update.
 			$ArchiveDateBak = Gdn::Config('Vanilla.Archive.Date');
@@ -85,7 +87,6 @@ class SettingsController extends Gdn_Controller {
       $this->AddJsFile('global.js');
       
       if (in_array($this->ControllerName, array('profilecontroller', 'activitycontroller'))) {
-         // $this->AddJsFile('jquery.menu.js');
          $this->AddCssFile('style.css');
       } else {
          $this->AddCssFile('admin.css');
@@ -161,8 +162,9 @@ class SettingsController extends Gdn_Controller {
       $RoleModel = new RoleModel();
       $PermissionModel = Gdn::PermissionModel();
       $this->Form->SetModel($this->CategoryModel);
+      $this->AddJsFile('jquery.alphanumeric.js');
       $this->AddJsFile('categories.js');
-      $this->AddJsFile('/js/library/jquery.gardencheckboxgrid.js');
+      $this->AddJsFile('jquery.gardencheckboxgrid.js');
       $this->Title(T('Add Category'));
       $this->AddSideMenu('vanilla/settings/managecategories');
       
@@ -176,8 +178,9 @@ class SettingsController extends Gdn_Controller {
 			$this->Form->SetFormValue('AllowDiscussions', $IsParent == '1' ? '0' : '1');
          $CategoryID = $this->Form->Save();
          if ($CategoryID) {               
-            $this->StatusMessage = T('The category was created successfully.');
-            $this->RedirectUrl = Url('vanilla/settings/managecategories');
+            // $this->StatusMessage = T('The category was created successfully.');
+            // $this->RedirectUrl = Url('vanilla/settings/managecategories');
+				Redirect('vanilla/settings/managecategories');
          } else {
 				unset($CategoryID);
 			}
@@ -271,7 +274,9 @@ class SettingsController extends Gdn_Controller {
       $PermissionModel = Gdn::PermissionModel();
       $this->Form->SetModel($this->CategoryModel);
       $this->Category = $this->CategoryModel->GetID($CategoryID);
-      $this->AddJsFile('/js/library/jquery.gardencheckboxgrid.js');
+      $this->AddJsFile('jquery.alphanumeric.js');
+      $this->AddJsFile('categories.js');
+      $this->AddJsFile('jquery.gardencheckboxgrid.js');
       $this->Title(T('Edit Category'));
          
       $this->AddSideMenu('vanilla/settings/managecategories');
@@ -287,8 +292,9 @@ class SettingsController extends Gdn_Controller {
       } else {
          if ($this->Form->Save()) {
             // Report success
-            $this->StatusMessage = T('The category was saved successfully.');
-            $this->RedirectUrl = Url('vanilla/settings/managecategories');
+            // $this->StatusMessage = T('The category was saved successfully.');
+            // $this->RedirectUrl = Url('vanilla/settings/managecategories');
+				Redirect('vanilla/settings/managecategories');
          }
       }
        
@@ -306,6 +312,7 @@ class SettingsController extends Gdn_Controller {
       $this->AddJsFile('categories.js');
       $this->AddJsFile('jquery.tablednd.js');
       $this->AddJsFile('jquery.ui.packed.js');
+      $this->AddJsFile('js/library/jquery.alphanumeric.js');
       $this->Title(T('Categories'));
       $this->CategoryData = $this->CategoryModel->GetAll('Sort');
       

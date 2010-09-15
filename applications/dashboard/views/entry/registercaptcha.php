@@ -21,7 +21,7 @@
       </li>
       <li>
          <?php
-            echo $this->Form->Label('Name', 'Name');
+            echo $this->Form->Label('Username', 'Name');
             echo $this->Form->TextBox('Name');
             echo '<span id="NameUnavailable" class="Incorrect" style="display: none;">'.T('Name Unavailable').'</span>';
          ?>
@@ -46,7 +46,7 @@
          ?>
       </li>
       <li class="CaptchaInput"><?php
-         echo $this->Form->Label("Prove you aren't a robot!", '');
+         echo $this->Form->Label("Security Check", '');
          echo recaptcha_get_html($CaptchaPublicKey);
       ?></li>
       <li>

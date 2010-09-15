@@ -34,13 +34,12 @@ class ProfileController extends Gdn_Controller {
    public function Initialize() {
       $this->ModuleSortContainer = 'Profile';
       $this->Head = new HeadModule($this);
-      $this->AddJsFile('js/library/jquery.js');
-      $this->AddJsFile('js/library/jquery.livequery.js');
-      $this->AddJsFile('js/library/jquery.form.js');
-      $this->AddJsFile('js/library/jquery.popup.js');
-      // $this->AddJsFile('js/library/jquery.menu.js');
-      $this->AddJsFile('js/library/jquery.gardenhandleajaxform.js');
-      $this->AddJsFile('js/global.js');
+      $this->AddJsFile('jquery.js');
+      $this->AddJsFile('jquery.livequery.js');
+      $this->AddJsFile('jquery.form.js');
+      $this->AddJsFile('jquery.popup.js');
+      $this->AddJsFile('jquery.gardenhandleajaxform.js');
+      $this->AddJsFile('global.js');
       
       $this->AddCssFile('style.css');
       $GuestModule = new GuestModule($this);
@@ -104,6 +103,13 @@ class ProfileController extends Gdn_Controller {
             $this->CommentData = FALSE;
          }
       }
+
+      // Set the canonical Url.
+      if (is_numeric($this->User->Name) || Gdn_Format::Url($this->User->Name) != strtolower($this->User->Name)) {
+         $this->CanonicalUrl(Url('profile/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name), TRUE));
+      } else {
+         $this->CanonicalUrl(Url('profile/'.strtolower($this->User->Name), TRUE));
+      }
       
       $this->Render();
    }
@@ -128,7 +134,7 @@ class ProfileController extends Gdn_Controller {
       $this->GetUserInfo($UserReference);
       $Session = Gdn::Session();
       if ($Session->UserID != $this->User->UserID)
-         $this->Permission('Garden.User.Edit');
+         $this->Permission('Garden.Users.Edit');
       
       $this->CanEditUsername = TRUE;
       $this->CanEditUsername = $this->CanEditUsername & Gdn::Config("Garden.Profile.EditUsernames");
@@ -165,7 +171,7 @@ class ProfileController extends Gdn_Controller {
    }
 
    public function Index($UserReference = '', $Username = '') {
-      $this->Activity($UserReference, $Username);
+      return $this->Activity($UserReference, $Username);
    }
    
    public function Invitations() {
@@ -253,17 +259,21 @@ class ProfileController extends Gdn_Controller {
             // Generate the target image name
             $TargetImage = $UploadImage->GenerateTargetName(PATH_ROOT . DS . 'uploads');
             $ImageBaseName = pathinfo($TargetImage, PATHINFO_BASENAME);
-            
+
             // Delete any previously uploaded images
-            @unlink(PATH_ROOT . DS . 'uploads' . DS . 'p' . $this->User->Photo);
+            @unlink( PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 'p%s'));
             // Don't delete this one because it hangs around in activity streams:
-            // @unlink(PATH_ROOT . DS . 'uploads' . DS . 't' . $this->User->Photo); 
-            @unlink(PATH_ROOT . DS . 'uploads' . DS . 'n' . $this->User->Photo);
+            // @unlink(PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 't%s'));
+            @unlink(PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 'n%s'));
+
+            // Make sure the avatars folder exists.
+            if (!file_exists(PATH_ROOT.'/uploads/userpics'))
+               mkdir(PATH_ROOT.'/uploads/userpics');
             
             // Save the uploaded image in profile size
             $UploadImage->SaveImageAs(
                $TmpImage,
-               PATH_ROOT . DS . 'uploads' . DS . 'p'.$ImageBaseName,
+               PATH_ROOT.'/uploads/userpics/p'.$ImageBaseName,
                Gdn::Config('Garden.Profile.MaxHeight', 1000),
                Gdn::Config('Garden.Profile.MaxWidth', 250)
             );
@@ -271,7 +281,7 @@ class ProfileController extends Gdn_Controller {
             // Save the uploaded image in preview size
             $UploadImage->SaveImageAs(
                $TmpImage,
-               PATH_ROOT . DS . 'uploads' . DS . 't'.$ImageBaseName,
+               PATH_ROOT.'/uploads/userpics/t'.$ImageBaseName,
                Gdn::Config('Garden.Preview.MaxHeight', 100),
                Gdn::Config('Garden.Preview.MaxWidth', 75)
             );
@@ -280,7 +290,7 @@ class ProfileController extends Gdn_Controller {
             $ThumbSize = Gdn::Config('Garden.Thumbnail.Size', 50);
             $UploadImage->SaveImageAs(
                $TmpImage,
-               PATH_ROOT . DS . 'uploads' . DS . 'n'.$ImageBaseName,
+               PATH_ROOT.'/uploads/userpics/n'.$ImageBaseName,
                $ThumbSize,
                $ThumbSize,
                TRUE
@@ -291,9 +301,7 @@ class ProfileController extends Gdn_Controller {
          }
          // If there were no errors, associate the image with the user
          if ($this->Form->ErrorCount() == 0) {
-            $PhotoModel = new Gdn_Model('Photo');
-            $PhotoID = $PhotoModel->Insert(array('Name' => $ImageBaseName));
-            if (!$this->UserModel->Save(array('UserID' => $this->User->UserID, 'PhotoID' => $PhotoID, 'Photo' => $ImageBaseName)))
+            if (!$this->UserModel->Save(array('UserID' => $this->User->UserID, 'Photo' => 'userpics/'.$ImageBaseName)))
                $this->Form->SetValidationResults($this->UserModel->ValidationResults());
          }
          // If there were no problems, redirect back to the user account
@@ -397,7 +405,7 @@ class ProfileController extends Gdn_Controller {
    
    public function Thumbnail() {
       $this->Permission('Garden.SignIn.Allow');
-      $this->AddJsFile('/js/library/jquery.jcrop.pack.js');
+      $this->AddJsFile('jquery.jcrop.pack.js');
       $this->AddJsFile('profile.js');
             
       $Session = Gdn::Session();
@@ -414,9 +422,14 @@ class ProfileController extends Gdn_Controller {
       // Define the thumbnail size
       $this->ThumbSize = Gdn::Config('Garden.Thumbnail.Size', 32);
       
-      // Define the source (profile sized) picture & dimensions
-      $Source = PATH_ROOT . DS . 'uploads' . DS . 'p'. $this->User->Photo;
-      $this->SourceSize = getimagesize($Source);
+      // Define the source (profile sized) picture & dimensions.
+      if (preg_match('`https?://`i', $this->User->Photo)) {
+         $this->Form->AddError('You cannont edit the thumbnail of an externally linked profile picture.');
+         $this->SourceSize = 0;
+      } else {
+         $Source = PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 'p%s');
+         $this->SourceSize = getimagesize($Source);
+      }
       
       // Add some more hidden form fields for jcrop
       $this->Form->AddHidden('x', '0');
@@ -451,7 +464,7 @@ class ProfileController extends Gdn_Controller {
             );
             
             // Save the target thumbnail
-            imagejpeg($TargetImage, PATH_ROOT . DS . 'uploads' . DS . 'n'.$this->User->Photo);
+            imagejpeg($TargetImage, PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 'n%s'));
          } catch (Exception $ex) {
             $this->Form->AddError($ex->getMessage());
          }
@@ -509,6 +522,7 @@ class ProfileController extends Gdn_Controller {
       if ($this->User !== FALSE) {
          $SideMenu = new SideMenuModule($this);
          $SideMenu->HtmlId = 'UserOptions';
+			$SideMenu->AutoLinkGroups = FALSE;
          $Session = Gdn::Session();
          $ViewingUserID = $Session->UserID;
          $SideMenu->AddItem('Options', '');
@@ -519,7 +533,7 @@ class ProfileController extends Gdn_Controller {
          if ($this->User->UserID != $ViewingUserID) {
             // Include user js files for people with edit users permissions
             if ($Session->CheckPermission('Garden.Users.Edit')) {
-              $this->AddJsFile('js/library/jquery.gardenmorepager.js');
+              $this->AddJsFile('jquery.gardenmorepager.js');
               $this->AddJsFile('user.js');
             }
             
@@ -530,7 +544,7 @@ class ProfileController extends Gdn_Controller {
             $SideMenu->AddLink('Options', T('Edit Account'), '/user/edit/'.$this->User->UserID, 'Garden.Users.Edit', array('class' => 'Popup'));
             $SideMenu->AddLink('Options', T('Delete Account'), '/user/delete/'.$this->User->UserID, 'Garden.Users.Delete');
             if ($this->User->Photo != '' && $AllowImages)
-               $SideMenu->AddLink('Options', T('Remove Picture'), '/profile/removepicture/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name).'/'.$Session->TransientKey(), 'Garden.User.Edit', array('class' => 'RemovePictureLink'));
+               $SideMenu->AddLink('Options', T('Remove Picture'), '/profile/removepicture/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name).'/'.$Session->TransientKey(), 'Garden.Users.Edit', array('class' => 'RemovePictureLink'));
             
             $SideMenu->AddLink('Options', T('Edit Preferences'), '/profile/preferences/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name), 'Garden.Users.Edit', array('class' => 'Popup'));
          } else {
@@ -576,7 +590,7 @@ class ProfileController extends Gdn_Controller {
          $UserInfoModule->User = $this->User;
          $UserInfoModule->Roles = $this->Roles;
          $this->AddModule($UserInfoModule);
-         $this->AddJsFile('/js/library/jquery.jcrop.pack.js');
+         $this->AddJsFile('jquery.jcrop.pack.js');
          $this->AddJsFile('profile.js');
          $this->AddJsFile('activity.js');
          $ActivityUrl = 'profile/activity/';

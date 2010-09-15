@@ -58,7 +58,7 @@ class Gdn_Request {
    }
    
    /**
-    * Gets/Sets the domain from the current url. e.g. "http://localhost/" in
+    * Gets/Sets the domain from the current url. e.g. "http://localhost" in
     * "http://localhost/this/that/garden/index.php?/controller/action/"
     *
     * @param $Domain optional value to set
@@ -203,11 +203,13 @@ class Gdn_Request {
     * @param int $ParamType Type of data to export. One of the self::INPUT_* constants
     * @return array
     */
-   public function GetRequestArguments($ParamType) {
-      if (!isset($this->_RequestArguments[$ParamType]))
+   public function GetRequestArguments($ParamType = NULL) {
+      if ($ParamType === NULL)
+         return $this->_RequestArguments;
+      elseif (!isset($this->_RequestArguments[$ParamType]))
          return array();
-
-      return $this->_RequestArguments[$ParamType];
+      else
+         return $this->_RequestArguments[$ParamType];
    }
 
    /**
@@ -265,11 +267,25 @@ class Gdn_Request {
       }
       return $Default;
    }
-   
+
+   /**
+    * Gets/Sets the host from the current url. e.g. "foo.com" in
+    * "http://foo.com/this/that/garden/index.php?/controller/action/"
+    *
+    * @param $HostName optional value to set.
+    * @return string | NULL
+    */
    public function Host($Hostname = NULL) {
       return $this->RequestHost($Hostname);
    }
-   
+
+   /**
+    * Gets/Sets the scheme from the current url. e.g. "http" in
+    * "http://foo.com/this/that/garden/index.php?/controller/action/"
+    *
+    * @param $Scheme optional value to set.
+    * @return string | NULL
+    */
    public function Scheme($Scheme = NULL) {
       return $this->RequestScheme($Scheme);
    }
@@ -284,32 +300,28 @@ class Gdn_Request {
     * @return void
     */
    protected function _LoadEnvironment() {
-   
       $this->_EnvironmentElement('ConfigWebRoot', Gdn::Config('Garden.WebRoot'));
       $this->_EnvironmentElement('ConfigStrips', Gdn::Config('Garden.StripWebRoot', FALSE));
 
-      if (!isset($_SERVER['SHELL'])) {
-         $this->RequestHost(     isset($_SERVER['HTTP_HOST']) ? ArrayValue('HTTP_HOST',$_SERVER) : ArrayValue('SERVER_NAME',$_SERVER));
-         $this->RequestMethod(   isset($_SERVER['REQUEST_METHOD']) ? ArrayValue('REQUEST_METHOD',$_SERVER) : 'CONSOLE');
-         
-         $this->RequestScheme(   (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') ? 'https' : 'http');
-      } else {
-         $this->RequestScheme('console');
-      }
+      $this->RequestHost(     isset($_SERVER['HTTP_HOST']) ? ArrayValue('HTTP_HOST',$_SERVER) : ArrayValue('SERVER_NAME',$_SERVER));
+      $this->RequestMethod(   isset($_SERVER['REQUEST_METHOD']) ? ArrayValue('REQUEST_METHOD',$_SERVER) : 'CONSOLE');
+      $this->RequestScheme(   (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') ? 'https' : 'http');
       
-      if ($this->RequestScheme() != "console" && is_array($_GET)) {
-         $Get = (is_array($_SERVER) && isset($_SERVER['QUERY_STRING'])) ? ArrayValue('QUERY_STRING', $_SERVER, FALSE) : $_GET;
-         if ($Get === FALSE) $Get = $_GET;
+      if (is_array($_GET)) {
+         $Get = FALSE;
+         if ($Get === FALSE) $Get =& $_GET;
          if (!is_array($Get)) {
             $Original = array();
             parse_str($Get, $Original);
             SafeParseStr($Get, $Get, $Original);
          }
-         
-         $Value = reset($Get);
-         $Path = key($Get);
-         if ($Value)
-            $Path = FALSE;
+
+         if (isset($Get['p'])) {
+            $Path = $Get['p'];
+            unset($_GET['p']);
+         } else {
+            $Path = '';
+         }
          
          $this->RequestURI($Path);
       }
@@ -413,12 +425,13 @@ class Gdn_Request {
        */
 
       $UrlParts = explode('/', $this->Path());
-      $LastParam = array_pop(array_slice($UrlParts, -1, 1));
+      $Last = array_slice($UrlParts, -1, 1);
+      $LastParam = array_pop($Last);
       $Match = array();
-      if (preg_match('/^([^.]+)\.([^.]+)$/', $LastParam, $Match)) {
+      if (preg_match('/^(.+)\.([^.]{1,4})$/', $LastParam, $Match)) {
          $this->OutputFormat($Match[2]);
          $this->Filename($Match[0]);
-         $this->Path(implode('/',array_slice($UrlParts, 0, -1)));
+         //$this->Path(implode('/',array_slice($UrlParts, 0, -1)));
       }
 
       /**
@@ -434,9 +447,13 @@ class Gdn_Request {
          $Key = array_search('index.php', $WebRoot);
          if ($Key !== FALSE) {
             $WebRoot = implode('/', array_slice($WebRoot, 0, $Key));
+         } else {
+            // Could not determine webroot.
+            $WebRoot = '';
          }
+         
       }
-
+      
       $ParsedWebRoot = trim($WebRoot,'/');
       $this->WebRoot($ParsedWebRoot);
 
@@ -493,6 +510,52 @@ class Gdn_Request {
     */
    public function Path($Path = NULL) {
       return $this->_ParsedRequestElement('Path', $Path);
+   }
+
+   public function PathAndQuery($PathAndQuery = NULL) {
+      // Set the path and query if it is supplied.
+      if ($PathAndQuery) {
+         // Parse out the path into parts.
+         $Parts = parse_url($PathAndQuery);
+         $Path = GetValue('path', $Parts, '');
+
+         // Check for a filename.
+         $Filename = basename($Path);
+         if (strpos($Filename, '.') !== FALSE)
+            $Path = substr($Path, 0, -strlen($Filename));
+         else
+            $Filename = '';
+         $Path = trim($Path, '/');
+
+         $Query = GetValue('query', $Parts, '');
+         if (strlen($Query) > 0) {
+            $GetParts = explode('&', $Query);
+            $Get = array();
+            foreach ($GetParts as $GetPart) {
+               $GetTuple = explode('=', $GetPart);
+               $Get[urldecode($GetTuple[0])] = urldecode(GetValue(1, $GetTuple, ''));
+            }
+         } else {
+            $Get = array();
+         }
+
+         // Set the parts of the query here.
+         $this->_ParsedRequest['Path'] = $Path;
+         $this->_ParsedRequest['Filename'] = $Filename;
+         $this->_RequestArguments[self::INPUT_GET] = $Get;
+      }
+
+      // Construct the path and query.
+      $Result = $this->Path();
+
+      $Filename = $this->Filename();
+      if ($Filename && $Filename != 'default')
+         $Result .= ConcatSep('/', $Result, $Filename);
+      $Get = $this->GetRequestArguments(self::INPUT_GET);
+      if (count($Get) > 0)
+         $Result .= '?'.http_build_query($Get);
+
+      return $Result;
    }
    
    public function Reset() {
@@ -582,7 +645,10 @@ class Gdn_Request {
     * @return string
     */
    public function Url($Path = '', $WithDomain = FALSE, $SSL = NULL) {
-      if (!C('Garden.AllowSSL'))
+      static $AllowSSL = NULL; if ($AllowSSL === NULL) $AllowSSL = C('Garden.AllowSSL', FALSE);
+      static $RewriteUrls = NULL; if ($RewriteUrls === NULL) $RewriteUrls = C('Garden.RewriteUrls', FALSE);
+      
+      if (!$AllowSSL)
          $SSL = NULL;
       
       // If we are explicitly setting ssl urls one way or another
@@ -592,9 +658,13 @@ class Gdn_Request {
          // And make sure to use ssl or not
          if ($SSL) {
             $Path = str_replace('http:', 'https:', $Path);
+            $Scheme = 'https';
          } else {
             $Path = str_replace('https:', 'http:', $Path);
+            $Scheme = 'http';
          }
+      } else {
+         $Scheme = $this->Scheme();
       }
       
       if (strpos($Path, '://') !== FALSE)
@@ -603,21 +673,36 @@ class Gdn_Request {
       $Parts = array();
 
       if ($WithDomain) {
-         $Parts[] = $this->Domain();
+         $Parts[] = $Scheme.'://'.$this->Host();
       } else
          $Parts[] = '';
 
       if ($this->WebRoot() != '')
          $Parts[] = $this->WebRoot();
 
+      // Strip out the querystring.
+      $Query = strrchr($Path, '?');
+      if (strlen($Query) > 0)
+         $Path = substr($Path, 0, -strlen($Query));
 
-      if (!C('Garden.RewriteUrls')) {
-         $Parts[] = $this->_EnvironmentElement('Script').'?';
-         $Path = str_replace('?', '&', $Path);
+      if (!$RewriteUrls) {
+         $Parts[] = $this->_EnvironmentElement('Script').'?p=';
+         $Query = str_replace('?', '&', $Query);
       }
 
-      if($Path == '')
-         $Path = $this->Path();
+      if($Path == '') {
+         $PathParts = explode('/', $this->Path());
+         $PathParts = array_map('urlencode', $PathParts);
+         $Path = implode('/', $PathParts);
+         // Grab the get parameters too.
+         if (!$Query) {
+            $Query = $this->GetRequestArguments(self::INPUT_GET);
+            if (count($Query) > 0)
+               $Query = ($RewriteUrls ? '?' : '&').http_build_query($Query);
+            else
+               unset($Query);
+         }
+      }
       $Parts[] = trim($Path, '/');
 
       $Result = implode('/', $Parts);
@@ -631,6 +716,9 @@ class Gdn_Request {
             $Result = str_replace('https:', 'http:', $Result);
          }
       }
+
+      if (isset($Query))
+         $Result .= $Query;
          
       return $Result;
    }

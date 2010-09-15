@@ -26,7 +26,7 @@ class EntryController extends Gdn_Controller {
       $this->Form->SetModel($this->UserModel);
       $this->Form->AddHidden('ClientHour', date('G', time())); // Use the server's current hour as a default
       $this->Form->AddHidden('Target', GetIncomingValue('Target', ''));
-   
+      
       // Import authenticator data source
       switch ($Authenticator->DataSourceType()) {
          case Gdn_Authenticator::DATA_FORM:
@@ -41,6 +41,7 @@ class EntryController extends Gdn_Controller {
       
       // By default, just render the view
       $Reaction = Gdn_Authenticator::REACT_RENDER;
+      
       // Where are we in the process? Still need to gather (render view) or are we validating?
       $AuthenticationStep = $Authenticator->CurrentStep();
       switch ($AuthenticationStep) {
@@ -49,6 +50,8 @@ class EntryController extends Gdn_Controller {
          case Gdn_Authenticator::MODE_REPEAT:
          
             $Reaction = $Authenticator->RepeatResponse();
+            
+         break;
             
          // Not enough information to perform authentication, render input form
          case Gdn_Authenticator::MODE_GATHER:
@@ -61,32 +64,40 @@ class EntryController extends Gdn_Controller {
          // All information is present, authenticate
          case Gdn_Authenticator::MODE_VALIDATE:
             
-            // Attempt to authenticate...
-            $AuthenticationResponse = $Authenticator->Authenticate();
-            switch ($AuthenticationResponse) {
-               case Gdn_Authenticator::AUTH_PERMISSION:
-                  $this->Form->AddError('ErrorPermission');
-               break;
-               
-               case Gdn_Authenticator::AUTH_DENIED:
-                  $this->Form->AddError('ErrorCredentials');
-               break;
-               
-               case Gdn_Authenticator::AUTH_INSUFFICIENT:
-                  // Unable to comply with auth request, more information is needed from user.
-                  $this->Form->AddError('ErrorInsufficient');
-               break;
-               
-               case Gdn_Authenticator::AUTH_PARTIAL:
-                  // Partial auth completed.
-                  $Reaction = $Authenticator->PartialResponse();
-               break;
-               
-               case Gdn_Authenticator::AUTH_SUCCESS:
-               default:
-                  // Full auth completed.
-                  $UserID = $AuthenticationResponse;
-                  $Reaction = $Authenticator->SuccessResponse();
+            // Attempt to authenticate.
+            try {
+               $AuthenticationResponse = $Authenticator->Authenticate();
+               Gdn::Authenticator()->Trigger($AuthenticationResponse);
+               switch ($AuthenticationResponse) {
+                  case Gdn_Authenticator::AUTH_PERMISSION:
+                     $this->Form->AddError('ErrorPermission');
+                     $Reaction = $Authenticator->FailedResponse();
+                  break;
+
+                  case Gdn_Authenticator::AUTH_DENIED:
+                     $this->Form->AddError('ErrorCredentials');
+                     $Reaction = $Authenticator->FailedResponse();
+                  break;
+
+                  case Gdn_Authenticator::AUTH_INSUFFICIENT:
+                     // Unable to comply with auth request, more information is needed from user.
+                     $this->Form->AddError('ErrorInsufficient');
+                     $Reaction = $Authenticator->FailedResponse();
+                  break;
+
+                  case Gdn_Authenticator::AUTH_PARTIAL:
+                     // Partial auth completed.
+                     $Reaction = $Authenticator->PartialResponse();
+                  break;
+
+                  case Gdn_Authenticator::AUTH_SUCCESS:
+                  default: 
+                     // Full auth completed.
+                     $UserID = $AuthenticationResponse;
+                     $Reaction = $Authenticator->SuccessResponse();
+               }
+            } catch (Exception $Ex) {
+               $this->Form->AddError($Ex);
             }
          break;
       }
@@ -103,8 +114,10 @@ class EntryController extends Gdn_Controller {
          break;
       
          case Gdn_Authenticator::REACT_REMOTE:
-            // Render the view, but set the delivery type to VIEW
+            // Let the authenticator handle generating output, using a blank slate
             $this->_DeliveryType= DELIVERY_TYPE_VIEW;
+            
+            exit;
          break;
          
          case Gdn_Authenticator::REACT_REDIRECT:
@@ -118,10 +131,12 @@ class EntryController extends Gdn_Controller {
             if ($this->_DeliveryType != DELIVERY_TYPE_ALL) {
                $this->RedirectUrl = Url($Route);
             } else {
-               if ($Route !== FALSE)
+               
+               if ($Route !== FALSE) {
                   Redirect($Route);
-               else
+               } else {
                   Redirect(Gdn::Router()->GetDestination('DefaultController'));
+               }
             }
          break;
       }
@@ -133,6 +148,10 @@ class EntryController extends Gdn_Controller {
       $this->SignIn();
    }
    
+   public function Password() {
+      $this->Auth('password');
+   }
+   
    /**
     * This is a good example of how to use the form, model, and validator to
     * validate a form that does use the model, but doesn't save data to the
@@ -140,6 +159,28 @@ class EntryController extends Gdn_Controller {
     */
    public function SignIn() {
       $this->Auth('password');
+   }
+
+   /** A version of signin that supports multiple authentication methods.
+    *  This method should replace EntryController::SignIn() eventually.
+    *
+    * @param string $Method
+    */
+   public function SignIn2($SelectedMethod = FALSE) {
+      // Set up the initial methods. Other methods can be added by plugins.
+      $Methods = array(
+         'password' => array('Label' => 'Vanilla', 'Url' => Url('/entry/auth/password'), 'ViewLocation' => $this->FetchViewLocation('SignIn'))
+      );
+
+      // Make sure a valid method is chosen.
+      if (!array_key_exists((string)$SelectedMethod, $Methods)) {
+         $SelectedMethod = array_shift(array_keys($Methods));
+      }
+      
+      $this->SetData('SelectedMethod', $SelectedMethod);
+      $this->SetData('Methods', $Methods);
+
+      return $this->Render();
    }
    
    public function Handshake($AuthenticationSchemeAlias = 'default') {
@@ -162,28 +203,91 @@ class EntryController extends Gdn_Controller {
          Gdn::Request()->WithURI('/entry/signin');
          return Gdn::Dispatcher()->Dispatch();
       }
-
+      
+      $UserInfo = array(
+         'UserKey'      => $Authenticator->GetUserKeyFromHandshake($Payload),
+         'ConsumerKey'  => $Authenticator->GetProviderKeyFromHandshake($Payload),
+         'TokenKey'     => $Authenticator->GetTokenKeyFromHandshake($Payload),
+         'UserName'     => $Authenticator->GetUserNameFromHandshake($Payload),
+         'UserEmail'    => $Authenticator->GetUserEmailFromHandshake($Payload)
+      );
+      
+      // Manual user sync is disabled. No hand holding will occur for users.
+      $SyncScreen = C('Garden.Authenticator.SyncScreen', 'on');
+      switch ($SyncScreen) {
+         case 'on':
+         
+            $this->SyncScreen($Authenticator, $UserInfo, $Payload);
+            
+         break;
+         
+         case 'off':
+         case 'smart':
+            $UserID = $this->UserModel->Synchronize($UserInfo['UserKey'], array(
+               'Name'   => $UserInfo['UserName'],
+               'Email'  => $UserInfo['UserEmail']
+            ));
+            
+            if ($UserID > 0) {
+               // Account created successfully.
+               
+               // Finalize the link between the forum user and the foreign userkey
+               $Authenticator->Finalize($UserInfo['UserKey'], $UserID, $UserInfo['ConsumerKey'], $UserInfo['TokenKey'], $Payload);
+               
+               /// ... and redirect them appropriately
+               $Route = $this->RedirectTo();
+               if ($Route !== FALSE)
+                  Redirect($Route);
+               else
+                  Redirect('/');
+                  
+            } else {
+               // Account not created.
+               if ($SyncScreen == 'smart') {
+               
+                  $this->StatusMessage = T('There is already an account in this forum using your email address. Please create a new account, or enter the credentials for the existing account.');
+                  $this->SyncScreen($Authenticator, $UserInfo, $Payload);
+                  
+               } else {
+                  
+                  // Set the memory cookie to allow signinloopback to shortcircuit remote query.
+                  $CookiePayload = array(
+                     'Sync'   => 'Failed'
+                  );
+                  $SerializedCookiePayload = Gdn_Format::Serialize($CookiePayload);
+                  $Authenticator->Remember($UserInfo['ConsumerKey'], $SerializedCookiePayload);
+                  
+                  // This resets vanilla's internal "where am I" to the homepage. Needed.
+                  Gdn::Request()->WithRoute('DefaultController');
+                  $this->SelfUrl = Gdn::Request()->Path();
+                  
+                  $this->View = 'syncfailed';
+                  $this->ProviderSite = $Authenticator->GetProviderUrl();
+                  $this->Render();
+               }
+               
+            }
+         break;
+      
+      }
+   }
+   
+   public function SyncScreen($Authenticator, $UserInfo, $Payload) {
       $this->AddJsFile('entry.js');
       $this->View = 'handshake';
       $this->HandshakeScheme = $AuthenticationSchemeAlias;
       $this->Form->SetModel($this->UserModel);
       $this->Form->AddHidden('ClientHour', date('G', time())); // Use the server's current hour as a default
-      $Target = GetIncomingValue('Target', '/');
       $this->Form->AddHidden('Target', GetIncomingValue('Target', '/'));
-      
-      $UserKey = $Authenticator->GetUserKeyFromHandshake($Payload);
-      $ConsumerKey = $Authenticator->GetProviderKeyFromHandshake($Payload);
-      $TokenKey = $Authenticator->GetTokenKeyFromHandshake($Payload);
-      $UserName = $Authenticator->GetUserNameFromHandshake($Payload);
       
       $PreservedKeys = array(
          'UserKey', 'Token', 'Consumer', 'Email', 'Name', 'Gender', 'HourOffset'
       );
-      
       $UserID = 0;
-      
+      $Target = GetIncomingValue('Target', '/');
+   
       if ($this->Form->IsPostBack() === TRUE) {
-      
+            
          $FormValues = $this->Form->FormValues();
          if (ArrayValue('StopLinking', $FormValues)) {
          
@@ -196,11 +300,11 @@ class EntryController extends Gdn_Controller {
             // Try and synchronize the user with the new username/email.
             $FormValues['Name'] = $FormValues['NewName'];
             $FormValues['Email'] = $FormValues['NewEmail'];
-            $UserID = $this->UserModel->Synchronize($UserKey, $FormValues);
+            $UserID = $this->UserModel->Synchronize($UserInfo['UserKey'], $FormValues);
             $this->Form->SetValidationResults($this->UserModel->ValidationResults());
             
          } else {
-
+   
             // Try and sign the user in.
             $PasswordAuthenticator = Gdn::Authenticator()->AuthenticateWith('password');
             $PasswordAuthenticator->HookDataField('Email', 'SignInEmail');
@@ -219,7 +323,7 @@ class EntryController extends Gdn_Controller {
                $Data = $FormValues;
                $Data['UserID'] = $UserID;
                $Data['Email'] = ArrayValue('SignInEmail', $FormValues, '');
-               $UserID = $this->UserModel->Synchronize($UserKey, $Data);
+               $UserID = $this->UserModel->Synchronize($UserInfo['UserKey'], $Data);
             }
          }
          
@@ -227,7 +331,7 @@ class EntryController extends Gdn_Controller {
             // The user has been created successfully, so sign in now
             
             // Finalize the link between the forum user and the foreign userkey
-            $Authenticator->Finalize($UserKey, $UserID, $ConsumerKey, $TokenKey, $Payload);
+            $Authenticator->Finalize($UserInfo['UserKey'], $UserID, $UserInfo['ConsumerKey'], $UserInfo['TokenKey'], $Payload);
             
             /// ... and redirect them appropriately
             $Route = $this->RedirectTo();
@@ -247,8 +351,8 @@ class EntryController extends Gdn_Controller {
             Redirect($Target);
          }
          
-         $Name = $UserName;
-         $Email = $UserKey;
+         $Name = $UserInfo['UserName'];
+         $Email = $UserInfo['UserEmail'];
          
          // Set the defaults for a new user.
          $this->Form->SetFormValue('NewName', $Name);
@@ -430,24 +534,24 @@ class EntryController extends Gdn_Controller {
    
    public function PasswordRequest() {
       $this->Form->SetModel($this->UserModel);
-      if (
-         $this->Form->IsPostBack() === TRUE
-         && $this->Form->ValidateModel() == 0)
-      {
-         try {
-            if (!$this->UserModel->PasswordRequest($this->Form->GetFormValue('Email', ''))) {
-					$this->Form->AddError("Couldn't find an account associated with that email address.");
-				}
-         } catch (Exception $ex) {
-            $this->Form->AddError($ex->getMessage());
+      if ($this->Form->IsPostBack() === TRUE) {
+
+         if ($this->Form->ValidateModel() == 0) {
+            try {
+               if (!$this->UserModel->PasswordRequest($this->Form->GetFormValue('Email', ''))) {
+                  $this->Form->AddError("Couldn't find an account associated with that email address.");
+               }
+            } catch (Exception $ex) {
+               $this->Form->AddError($ex->getMessage());
+            }
+            if ($this->Form->ErrorCount() == 0) {
+               $this->Form->AddError('Success!');
+               $this->View = 'passwordrequestsent';
+            }
+         } else {
+            if ($this->Form->ErrorCount() == 0)
+               $this->Form->AddError('That email address was not found.');
          }
-         if ($this->Form->ErrorCount() == 0) {
-            $this->Form->AddError('Success!');
-            $this->View = 'passwordrequestsent';
-         }
-      } else {
-			if ($this->Form->ErrorCount() == 0)
-				$this->Form->AddError('That email address was not found.');
       }
       $this->Render();
    }
@@ -479,6 +583,19 @@ class EntryController extends Gdn_Controller {
       $this->Render();
    }
 
+   public function EmailConfirm($UserID = '', $EmailKey = '') {
+      if (!is_numeric($UserID) || $EmailKey != $this->UserModel->GetAttribute($UserID, 'EmailKey', '')) {
+         $this->Form->AddError(T('Couldn\'t confirm email.',
+            'We couldn\'t confirm your email. Check the link in the email we sent you or try sending another confirmation email.'));
+      }
+
+      if ($this->Form->ErrorCount() == 0) {
+         
+
+      }
+      $this->Render();
+   }
+
    public function Leave($AuthenticationSchemeAlias = 'default', $TransientKey = '') {
       try {
          $Authenticator = Gdn::Authenticator()->AuthenticateWith($AuthenticationSchemeAlias);
@@ -487,11 +604,10 @@ class EntryController extends Gdn_Controller {
       }
       
       // Only sign the user out if this is an authenticated postback!
-      $Session = Gdn::Session();
       $this->Leaving = FALSE;
       $Result = Gdn_Authenticator::REACT_RENDER;
       $AuthenticatedPostbackRequired = $Authenticator->RequireLogoutTransientKey();
-      if (!$AuthenticatedPostbackRequired || $Session->ValidateTransientKey($TransientKey)) {
+      if (!$AuthenticatedPostbackRequired || Gdn::Session()->ValidateTransientKey($TransientKey)) {
          $Result = $Authenticator->DeAuthenticate();
          $this->Leaving = TRUE;
       }
@@ -501,7 +617,7 @@ class EntryController extends Gdn_Controller {
          if ($Target = GetIncomingValue('Target', ''))
             $Reaction = $Target;
          else
-            $Reaction = $Authenticator->SuccessResponse();
+            $Reaction = $Authenticator->LogoutResponse();
       } else {
          $Reaction = $Authenticator->LoginResponse();
       }
@@ -510,12 +626,12 @@ class EntryController extends Gdn_Controller {
          $Route = $Reaction;
          if ($this->_DeliveryType != DELIVERY_TYPE_ALL) {
                $this->RedirectUrl = Url($Route);
-            } else {
-               if ($Route !== FALSE)
-                  Redirect($Route);
-               else
-                  Redirect(Gdn::Router()->GetDestination('DefaultController'));
-            }
+         } else {
+            if ($Route !== FALSE)
+               Redirect($Route);
+            else
+               Redirect(Gdn::Router()->GetDestination('DefaultController'));
+         }
       } else {
          switch ($Reaction) {
 
@@ -533,15 +649,16 @@ class EntryController extends Gdn_Controller {
 
             case Gdn_Authenticator::REACT_REDIRECT:
             default:
-               $Route = '/entry';
+               $Route = '/';
 
                if ($this->_DeliveryType != DELIVERY_TYPE_ALL) {
                   $this->RedirectUrl = Url($Route);
                } else {
-                  if ($Route !== FALSE)
+                  if ($Route !== FALSE) {
                      Redirect($Route);
-                  else
+                  } else {
                      Redirect(Gdn::Router()->GetDestination('DefaultController'));
+                  }
                }
             break;
          }
@@ -557,17 +674,15 @@ class EntryController extends Gdn_Controller {
    
    public function Initialize() {
       $this->Head = new HeadModule($this);
-      $this->AddJsFile('js/library/jquery.js');
-      $this->AddJsFile('js/library/jquery.livequery.js');
-      $this->AddJsFile('js/library/jquery.form.js');
-      $this->AddJsFile('js/library/jquery.popup.js');
-      // $this->AddJsFile('js/library/jquery.menu.js');
-      $this->AddJsFile('js/library/jquery.gardenhandleajaxform.js');
-      $this->AddJsFile('js/global.js');
+      $this->AddJsFile('jquery.js');
+      $this->AddJsFile('jquery.livequery.js');
+      $this->AddJsFile('jquery.form.js');
+      $this->AddJsFile('jquery.popup.js');
+      $this->AddJsFile('jquery.gardenhandleajaxform.js');
+      $this->AddJsFile('global.js');
       
       $this->AddCssFile('style.css');
       parent::Initialize();
    }
 
-   
 }

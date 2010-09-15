@@ -148,39 +148,55 @@ class Gdn_Configuration {
     * <code>$Configuration[$Group]['Database']['Host'] = $Value</code>.
     * @param mixed $Value The value of the configuration setting.
     * @param boolean $Overwrite If the setting already exists, should it's value be overwritten? Defaults to true.
+    * @param boolean $AddToSave Whether or not to queue the value up for the next call to Gdn_Config::Save().
     */
-   public function Set($Name, $Value, $Overwrite = TRUE) {
+   public function Set($Name, $Value, $Overwrite = TRUE, $AddToSave = TRUE) {
       if(!is_array($this->_Data))
          $this->_Data = array();
 
       if(!is_array($this->_SaveData))
          $this->_SaveData = array();
-
-      $Keys = explode('.', $Name);
-      $KeyCount = count($Keys);
-
-      $Array =& $this->_Data;
+         
+      if (!is_array($Name)) {
+         $Name = array(
+            $Name => $Value
+         );
+      } else {
+         $Overwrite = $Value;
+      }
       
-      $SaveArray =& $this->_SaveData;
-      for ($i = 0; $i < $KeyCount; ++$i) {
-         $Key = $Keys[$i];
-         if (!is_array($Array)) $Array = array();
-         $KeyExists = array_key_exists($Key, $Array);
+      $Data = $Name;
+      foreach ($Data as $Name => $Value) {
 
-         if($i == $KeyCount - 1) {   
-            // If we are on the last iteration of the key, then set the value.
-            if($KeyExists === FALSE || $Overwrite === TRUE) {
-               $Array[$Key] = Gdn_Format::Serialize($Value);
-               $SaveArray[$Key] = Gdn_Format::Serialize($Value);
+         $Keys = explode('.', $Name);
+         $KeyCount = count($Keys);
+   
+         $Array =& $this->_Data;
+         
+         $SaveArray =& $this->_SaveData;
+         for ($i = 0; $i < $KeyCount; ++$i) {
+            $Key = $Keys[$i];
+            if (!is_array($Array)) $Array = array();
+            $KeyExists = array_key_exists($Key, $Array);
+   
+            if($i == $KeyCount - 1) {   
+               // If we are on the last iteration of the key, then set the value.
+               if($KeyExists === FALSE || $Overwrite === TRUE) {
+                  $Array[$Key] = Gdn_Format::Serialize($Value);
+                  if ($AddToSave)
+                     $SaveArray[$Key] = Gdn_Format::Serialize($Value);
+               }
+            } else {
+               // Otherwise, traverse the array
+               if($KeyExists === FALSE) {
+                  $Array[$Key] = array();
+                  if ($AddToSave)
+                     $SaveArray[$Key] = array();
+               }
+               $Array =& $Array[$Key];
+               if ($AddToSave)
+                  $SaveArray =& $SaveArray[$Key];
             }
-         } else {
-            // Otherwise, traverse the array
-            if($KeyExists === FALSE) {
-               $Array[$Key] = array();
-               $SaveArray[$Key] = array();
-            }
-            $Array =& $Array[$Key];
-            $SaveArray =& $SaveArray[$Key];
          }
       }
    }
@@ -356,6 +372,9 @@ class Gdn_Configuration {
       if ($File == '')
          trigger_error(ErrorMessage('You must specify a file path to be saved.', 'Configuration', 'Save'), E_USER_ERROR);
 
+      if (!is_writable($File))
+         throw new Exception(sprintf(T("Unable to write to config file '%s' when saving."),$File));
+
       if($Group == '')
          $Group = $this->CurrentGroup;
 
@@ -381,7 +400,7 @@ class Gdn_Configuration {
          }
          
          $Line = "\$".$Group."['".$Name."']";
-         $this->_FormatArrayAssignment($NewLines, $Line, $Value);
+         FormatArrayAssignment($NewLines, $Line, $Value);
       }
       
       // Record who made the change and when
@@ -400,10 +419,10 @@ class Gdn_Configuration {
          trigger_error(ErrorMessage('Failed to define configuration file contents.', 'Configuration', 'Save'), E_USER_ERROR);
 
       // echo 'saving '.$File;
-      //Gdn_FileSystem::SaveFile($File, $FileContents);
+      Gdn_FileSystem::SaveFile($File, $FileContents, LOCK_EX);
       
       // Call the built in method to remove the dependancy to an external object.
-      file_put_contents($File, $FileContents);
+      //file_put_contents($File, $FileContents);
 
       // Clear out the save data array
       $this->_SaveData = array();
@@ -415,42 +434,6 @@ class Gdn_Configuration {
       ksort($Data);
    }
 
-   /**
-    * Undocumented method.
-    *
-    * @param array $Array
-    * @param string $Prefix
-    * @param mixed $Value
-    * @todo This method and all variables for this method need documentation.
-    */
-   private function _FormatArrayAssignment(&$Array, $Prefix, $Value) {
-      if (is_array($Value)) {
-         // If $Value doesn't contain a key of "0" OR it does and it's value IS
-         // an array, this should be treated as an associative array.
-         $IsAssociativeArray = array_key_exists(0, $Value) === FALSE || is_array($Value[0]) === TRUE ? TRUE : FALSE;
-         if ($IsAssociativeArray === TRUE) {
-            foreach ($Value as $k => $v) {
-               $this->_FormatArrayAssignment($Array, $Prefix."['$k']", $v);
-            }
-         } else {
-            // If $Value is not an associative array, just write it like a simple array definition.
-            $FormattedValue = array_map(array('Gdn_Format', 'ArrayValueForPhp'), $Value);
-            $Array[] = $Prefix .= " = array('".implode("', '", $FormattedValue)."');";
-         }
-      } elseif (is_int($Value)) {
-			$Array[] = $Prefix .= ' = '.$Value.';';
-		} elseif (is_bool($Value)) {
-         $Array[] = $Prefix .= ' = '.($Value ? 'TRUE' : 'FALSE').';';
-      } elseif (in_array($Value, array('TRUE', 'FALSE'))) {
-         $Array[] = $Prefix .= ' = '.($Value == 'TRUE' ? 'TRUE' : 'FALSE').';';
-      } else {
-         if (strpos($Value, "'") !== FALSE) {
-            $Array[] = $Prefix .= ' = "'.Gdn_Format::ArrayValueForPhp(str_replace('"', '\"', $Value)).'";';
-         } else {
-            $Array[] = $Prefix .= " = '".Gdn_Format::ArrayValueForPhp($Value)."';";
-         }
-      }
-   }
 }
 
 /**

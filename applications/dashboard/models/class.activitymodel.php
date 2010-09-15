@@ -23,12 +23,12 @@ class ActivityModel extends Gdn_Model {
          ->Select('t.Name', '', 'ActivityType')
          ->Select('au.Name', '', 'ActivityName')
          ->Select('au.Gender', '', 'ActivityGender')
-         ->Select('aup.Name', '', 'ActivityPhoto')
+         ->Select('au.Photo', '', 'ActivityPhoto')
          ->Select('ru.Name', '', 'RegardingName')
+         ->Select('ru.Gender', '', 'RegardingGender')
          ->From('Activity a')
          ->Join('ActivityType t', 'a.ActivityTypeID = t.ActivityTypeID')
          ->Join('User au', 'a.ActivityUserID = au.UserID')
-         ->Join('Photo aup', 'au.PhotoID = aup.PhotoID', 'left')
          ->Join('User ru', 'a.RegardingUserID = ru.UserID', 'left');
    }
    
@@ -46,8 +46,8 @@ class ActivityModel extends Gdn_Model {
       if ($UserID != '') {
          $this->SQL
             ->BeginWhereGroup()
-            ->Where('au.UserID', $UserID)
-            ->OrWhere('ru.UserID', $UserID)
+            ->Where('a.ActivityUserID', $UserID)
+            ->OrWhere('a.RegardingUserID', $UserID)
             ->EndWhereGroup();
       }
       
@@ -94,26 +94,35 @@ class ActivityModel extends Gdn_Model {
    public function Add($ActivityUserID, $ActivityType, $Story = '', $RegardingUserID = '', $CommentActivityID = '', $Route = '', $SendEmail = '') {
       // Make sure the user is authenticated
       // Get the ActivityTypeID & see if this is a notification
-      $ActivityType = $this->SQL
+      $ActivityTypeRow = $this->SQL
          ->Select('ActivityTypeID, Name, Notify')
          ->From('ActivityType')
          ->Where('Name', $ActivityType)
          ->Get()
          ->FirstRow();
          
-      if ($ActivityType !== FALSE) {
-         $ActivityTypeID = $ActivityType->ActivityTypeID;
-         $Notify = $ActivityType->Notify == '1';
+      if ($ActivityTypeRow !== FALSE) {
+         $ActivityTypeID = $ActivityTypeRow->ActivityTypeID;
+         $Notify = $ActivityTypeRow->Notify == '1';
       } else {
          trigger_error(ErrorMessage(sprintf('Activity type could not be found: %s', $ActivityType), 'ActivityModel', 'Add'), E_USER_ERROR);
       }
-      if ($ActivityType->Name == 'ActivityComment' && $Story == '') {
+      if ($ActivityTypeRow->Name == 'ActivityComment' && $Story == '') {
          $this->Validation->AddValidationResult('Body', 'You must provide a comment.');
          return FALSE;
       }
+
+      // Massage $SendEmail to allow for only sending an email.
+      $SendEmail = TRUE; // TODO: Allow just emails.
+      if ($SendEmail == 'Only') {
+         $SendEmail = '';
+         $AddActivity = FALSE;
+      } else {
+         $AddActivity = TRUE;
+      }
          
       // If this is a notification, increment the regardinguserid's count
-      if ($Notify) {
+      if ($AddActivity && $Notify) {
          $this->SQL
             ->Update('User')
             ->Set('CountNotifications', 'coalesce(CountNotifications) + 1', FALSE)
@@ -135,10 +144,12 @@ class ActivityModel extends Gdn_Model {
          
       if (is_numeric($CommentActivityID))
          $Fields['CommentActivityID'] = $CommentActivityID;
-         
-      $this->AddInsertFields($Fields);
-      $this->DefineSchema();
-      $ActivityID = $this->Insert($Fields); // NOTICE! This will silently fail if there are errors. Developers can figure out what's wrong by dumping the results of $this->ValidationResults();
+
+//      if ($AddActivity) {
+         $this->AddInsertFields($Fields);
+         $this->DefineSchema();
+         $ActivityID = $this->Insert($Fields); // NOTICE! This will silently fail if there are errors. Developers can figure out what's wrong by dumping the results of $this->ValidationResults();
+//      }
 
       // If $SendEmail was FALSE or TRUE, let it override the $Notify setting.
       if ($SendEmail === FALSE || $SendEmail === TRUE)
@@ -146,8 +157,8 @@ class ActivityModel extends Gdn_Model {
 
       // Otherwise let the decision to email lie with the $Notify setting.
 
-      // If the activity was saved successfully and it was a notification, send a notification to the user.
-      if ($ActivityID > 0 && $Notify)
+      // Send a notification to the user.
+      if ($Notify)
          $this->SendNotification($ActivityID);
       
       return $ActivityID;
@@ -158,7 +169,7 @@ class ActivityModel extends Gdn_Model {
       if (!is_object($Activity))
          return;
       
-      $Story = Gdn_Format::Text($Story == '' ? $Activity->Story : $Story);
+      $Story = Gdn_Format::Text($Story == '' ? $Activity->Story : $Story, FALSE);
       // If this is a comment on another activity, fudge the activity a bit so that everything appears properly.
       if (is_null($Activity->RegardingUserID) && $Activity->CommentActivityID > 0) {
          $CommentActivity = $this->GetID($Activity->CommentActivityID);
@@ -171,11 +182,11 @@ class ActivityModel extends Gdn_Model {
          $Preferences = Gdn_Format::Unserialize($User->Preferences);
          $Preference = ArrayValue('Email.'.$Activity->ActivityType, $Preferences, Gdn::Config('Preferences.Email.'.$Activity->ActivityType));
          if ($Preference) {
-            $ActivityHeadline = Gdn_Format::Text(Gdn_Format::ActivityHeadline($Activity, $Activity->ActivityUserID, $Activity->RegardingUserID));
+            $ActivityHeadline = Gdn_Format::Text(Gdn_Format::ActivityHeadline($Activity, $Activity->ActivityUserID, $Activity->RegardingUserID), FALSE);
             $Email = new Gdn_Email();
             $Email->Subject(sprintf(T('[%1$s] %2$s'), Gdn::Config('Garden.Title'), $ActivityHeadline));
             $Email->To($User->Email, $User->Name);
-            $Email->From(Gdn::Config('Garden.SupportEmail'), Gdn::Config('Garden.SupportName'));
+            //$Email->From(Gdn::Config('Garden.SupportEmail'), Gdn::Config('Garden.SupportName'));
             $Email->Message(
                sprintf(
                   T($Story == '' ? 'EmailNotification' : 'EmailStoryNotification'),

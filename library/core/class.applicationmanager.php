@@ -88,12 +88,27 @@ class Gdn_ApplicationManager {
          // Add some information about the applications to the array.
          foreach($EnabledApplications as $Name => $Folder) {
             $EnabledApplications[$Name] = array('Folder' => $Folder);
-            $EnabledApplications[$Name]['Version'] = Gdn::Config($Name.'.Version', '');
+            //$EnabledApplications[$Name]['Version'] = Gdn::Config($Name.'.Version', '');
+            $EnabledApplications[$Name]['Version'] = '';
+            // Get the application version from it's about file.
+            $AboutPath = PATH_APPLICATIONS.'/'.strtolower($Name).'/settings/about.php';
+            if (file_exists($AboutPath)) {
+               $ApplicationInfo = array();
+               include $AboutPath;
+               $EnabledApplications[$Name]['Version'] = GetValueR("$Name.Version", $ApplicationInfo, '');
+            }
          }
          $this->_EnabledApplications = $EnabledApplications;
       }
 
       return $this->_EnabledApplications;
+   }
+   
+   public function CheckApplication($ApplicationName) {
+      if (array_key_exists($ApplicationName, $this->_EnabledApplications))
+         return TRUE;
+         
+      return FALSE;
    }
    
    public function AvailableVisibleApplications() {
@@ -164,9 +179,8 @@ class Gdn_ApplicationManager {
          throw new Exception(T('The application folder was not properly defined.'));
 
       // Redefine the locale manager's settings $Locale->Set($CurrentLocale, $EnabledApps, $EnabledPlugins, TRUE);
-      $PluginManager = Gdn::Factory('PluginManager');
       $Locale = Gdn::Locale();
-      $Locale->Set($Locale->Current(), $this->EnabledApplicationFolders(), $PluginManager->EnabledPluginFolders(), TRUE);
+      $Locale->Set($Locale->Current(), $this->EnabledApplicationFolders(), Gdn::PluginManager()->EnabledPluginFolders(), TRUE);
       
       // Call the application's setup method
       $Hooks = $ApplicationName.'Hooks';
@@ -207,9 +221,8 @@ class Gdn_ApplicationManager {
       RemoveFromConfig('EnabledApplications'.'.'.$ApplicationName);
 
       // Redefine the locale manager's settings $Locale->Set($CurrentLocale, $EnabledApps, $EnabledPlugins, TRUE);
-      $PluginManager = Gdn::Factory('PluginManager');
       $Locale = Gdn::Locale();
-      $Locale->Set($Locale->Current(), $this->EnabledApplicationFolders(), $PluginManager->EnabledPluginFolders(), TRUE);
+      $Locale->Set($Locale->Current(), $this->EnabledApplicationFolders(), Gdn::PluginManager()->EnabledPluginFolders(), TRUE);
    }
 
    /**

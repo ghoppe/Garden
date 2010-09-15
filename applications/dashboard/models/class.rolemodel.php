@@ -21,15 +21,15 @@ class RoleModel extends Gdn_Model {
          $RoleID = $Values['RoleID'];
          unset($Values['RoleID']);
          
-         $this->SQL->Replace('Role', $Values, array('RoleID' => $RoleID));
+         $this->SQL->Replace('Role', $Values, array('RoleID' => $RoleID), TRUE);
       } else {
          // Check to see if there is a role with the same name.
          $RoleID = $this->SQL->GetWhere('Role', array('Name' => $Values['Name']))->Value('RoleID', NULL);
          
          if(is_null($RoleID)) {
-            // Figure out the next role ID which is the next biggest power of two.
+            // Figure out the next role ID.
             $MaxRoleID = $this->SQL->Select('r.RoleID', 'MAX')->From('Role r')->Get()->Value('RoleID', 0);
-            $RoleID = pow(2, ceil(log($MaxRoleID + 1, 2)));
+            $RoleID = $MaxRoleID + 1;
             $Values['RoleID'] = $RoleID;
             
             // Insert the role.
@@ -92,6 +92,7 @@ class RoleModel extends Gdn_Model {
     * Returns a resultset of role data related to the specified UserID.
     *
     * @param int The UserID to filter to.
+    * @return Gdn_DataSet
     */
    public function GetByUserID($UserID) {
       return $this->SQL->Select()
@@ -173,9 +174,9 @@ class RoleModel extends Gdn_Model {
       $RoleID = ArrayValue('RoleID', $FormPostValues);
       $Insert = $RoleID > 0 ? FALSE : TRUE;
       if ($Insert) {
-         // Figure out the next role ID which is the next biggest power of two.
+         // Figure out the next role ID.
          $MaxRoleID = $this->SQL->Select('r.RoleID', 'MAX')->From('Role r')->Get()->Value('RoleID', 0);
-         $RoleID = pow(2, ceil(log($MaxRoleID + 1, 2)));
+         $RoleID = $MaxRoleID + 1;
          
          $this->AddInsertFields($FormPostValues);
          $FormPostValues['RoleID'] = strval($RoleID); // string for validation
@@ -229,14 +230,6 @@ class RoleModel extends Gdn_Model {
       // Remove permissions for this role.
       $PermissionModel = Gdn::PermissionModel();
       $PermissionModel->Delete($RoleID);
-      
-      // Remove the cached permissions for all users with this role.
-      $this->SQL->Update('User')
-         ->Join('UserRole', 'User.UserID = UserRole.UserID')
-         ->Set('Permissions', '')
-         ->Set('CacheRoleID', NULL)
-         ->Where(array('UserRole.RoleID' => $RoleID))
-         ->Put();
       
       // Remove the role
       $this->SQL->Delete('Role', array('RoleID' => $RoleID));

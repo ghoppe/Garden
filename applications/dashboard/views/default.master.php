@@ -1,3 +1,4 @@
+<?php echo '<?xml version="1.0" encoding="utf-8"?>'; ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-ca">
 <head>
@@ -25,7 +26,7 @@
 							$this->Menu->AddLink('SignOut', T('Sign Out'), $Authenticator->SignOutUrl(), FALSE, array('class' => 'NonTab SignOut'));
 						} else {
 							$Attribs = array();
-							if (Gdn::Config('Garden.SignIn.Popup'))
+							if (C('Garden.SignIn.Popup') && strpos(Gdn::Request()->Url(), 'entry') === FALSE)
 								$Attribs['class'] = 'SignInPopup';
 								
 							$this->Menu->AddLink('Entry', T('Sign In'), $Authenticator->SignInUrl($this->SelfUrl), FALSE, array('class' => 'NonTab'), $Attribs);
@@ -33,7 +34,7 @@
 						echo $this->Menu->ToString();
 					}
 				?>
-            <div id="Search"><?php
+            <div class="Search"><?php
 					$Form = Gdn::Factory('Form');
 					$Form->InputPrefix = '';
 					echo 

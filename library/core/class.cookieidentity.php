@@ -29,12 +29,12 @@ class Gdn_CookieIdentity {
    public $CookieHashMethod;
    public $CookieSalt;
    
-   public function __contruct($Config = NULL) {
+   public function __construct($Config = NULL) {
       $this->Init($Config);
    }
    
    public function Init($Config = NULL) {
-      if(is_null($Config))
+      if (is_null($Config))
          $Config = Gdn::Config('Garden.Cookie');
       elseif(is_string($Config))
          $Config = Gdn::Config($Config);
@@ -53,6 +53,7 @@ class Gdn_CookieIdentity {
     */
    protected function _ClearIdentity() {
       // Destroy the cookie.
+      $this->UserID = 0;
       $this->_DeleteCookie($this->CookieName);
    }
    
@@ -67,7 +68,10 @@ class Gdn_CookieIdentity {
       if (!is_null($this->UserID))
          return $this->UserID;
          
-      if (!$this->_CheckCookie($this->CookieName)) return 0;
+      if (!$this->_CheckCookie($this->CookieName)) {
+         $this->_ClearIdentity();
+         return 0;
+      }
       
       list($UserID, $Expiration) = $this->GetCookiePayload($this->CookieName);
       
@@ -133,7 +137,6 @@ class Gdn_CookieIdentity {
       return $HashMethod($OuterPad . pack($PackFormat, $HashMethod($InnerPad . $Data)));
    }
    
-   
    /**
     * Generates the user's session cookie.
     *
@@ -143,6 +146,7 @@ class Gdn_CookieIdentity {
    public function SetIdentity($UserID, $Persist = FALSE) {
       if(is_null($UserID)) {
          $this->_ClearIdentity();
+         return;
       }
       
       $this->UserID = $UserID;
@@ -158,13 +162,13 @@ class Gdn_CookieIdentity {
       }
 
       // Create the cookie.
-      $KeyData = $UserID.$Expiration;
+      $KeyData = $UserID.'-'.$Expiration;
       $this->_SetCookie($this->CookieName, $KeyData, array($UserID, $Expiration), $Expire);
       $this->SetVolatileMarker($UserID);
    }
    
    public function SetVolatileMarker($UserID) {
-      if(is_null($UserID))
+      if (is_null($UserID))
          return;
       
       // Note: 172800 is 60*60*24*2 or 2 days
@@ -172,7 +176,7 @@ class Gdn_CookieIdentity {
       // Note: setting $Expire to 0 will cause the cookie to die when the browser closes.
       $Expire = 0;
       
-      $KeyData = $UserID.$Expiration;
+      $KeyData = $UserID.'-'.$Expiration;
       $this->_SetCookie($this->VolatileMarker, $KeyData, array($UserID, $Expiration), $Expire);
    }
    
@@ -181,19 +185,24 @@ class Gdn_CookieIdentity {
    }
    
    public static function SetCookie($CookieName, $KeyData, $CookieContents, $Expire, $Path = NULL, $Domain = NULL, $CookieHashMethod = NULL, $CookieSalt = NULL) {
-   
+      
       if (is_null($Path))
-         $Path = Gdn::Config('Garden.Cookie.Path');
+         $Path = Gdn::Config('Garden.Cookie.Path', '/');
 
       if (is_null($Domain))
-         $Domain = Gdn::Config('Garden.Cookie.Domain');
+         $Domain = Gdn::Config('Garden.Cookie.Domain', '');
+
+      // If the domain being set is completely incompatible with the current domain then make the domain work.
+      $CurrentHost = Gdn::Request()->Host();
+      if (!StringEndsWith($CurrentHost, trim($Domain, '.')))
+         $Domain = '';
    
-      if (is_null($CookieHashMethod))
+      if (!$CookieHashMethod)
          $CookieHashMethod = Gdn::Config('Garden.Cookie.HashMethod');
       
-      if (is_null($CookieSalt))
+      if (!$CookieSalt)
          $CookieSalt = Gdn::Config('Garden.Cookie.Salt');
-         
+      
       // Create the cookie contents
       $Key = self::_Hash($KeyData, $CookieHashMethod, $CookieSalt);
       $Hash = self::_HashHMAC($CookieHashMethod, $KeyData, $Key);
@@ -207,16 +216,21 @@ class Gdn_CookieIdentity {
 
       // Create the cookie.
       setcookie($CookieName, $CookieContents, $Expire, $Path, $Domain);
+      $_COOKIE[$CookieName] = $CookieContents;
    }
    
    protected function _CheckCookie($CookieName) {
-      return self::CheckCookie($CookieName, $this->CookieHashMethod, $this->CookieSalt);
+      $CookieStatus = self::CheckCookie($CookieName, $this->CookieHashMethod, $this->CookieSalt);
+      if ($CookieStatus === FALSE)
+         $this->_DeleteCookie($CookieName);
+      return $CookieStatus;
    }
    
    public static function CheckCookie($CookieName, $CookieHashMethod = NULL, $CookieSalt = NULL) {
-      if (empty($_COOKIE[$CookieName]))
+      if (empty($_COOKIE[$CookieName])) {
          return FALSE;
-         
+      }
+      
       if (is_null($CookieHashMethod))
          $CookieHashMethod = Gdn::Config('Garden.Cookie.HashMethod');
       
@@ -224,19 +238,25 @@ class Gdn_CookieIdentity {
          $CookieSalt = Gdn::Config('Garden.Cookie.Salt');
       
       $CookieData = explode('|', $_COOKIE[$CookieName]);
-      if (count($CookieData) < 5)
+      if (count($CookieData) < 5) {
+         self::DeleteCookie($CookieName);
          return FALSE;
-         
-      list($HashKey, $HMAC, $Time, $UserID, $Expiration) = $CookieData;
-      if ($Expiration < time() && $Expiration != 0)
+      }
+      
+      list($HashKey, $CookieHash, $Time, $UserID, $Expiration) = $CookieData;
+      if ($Expiration < time() && $Expiration != 0) {
+         self::DeleteCookie($CookieName);
          return FALSE;
-
+      }
+      
       $Key = self::_Hash($HashKey, $CookieHashMethod, $CookieSalt);
-      $Hash = self::_HashHMAC($CookieHashMethod, $HashKey, $Key);
+      $GeneratedHash = self::_HashHMAC($CookieHashMethod, $HashKey, $Key);
 
-      if ($HMAC != $Hash)
+      if ($CookieHash != $GeneratedHash) {
+         self::DeleteCookie($CookieName);
          return FALSE;
-
+      }
+      
       return TRUE;
    }
    
@@ -254,6 +274,7 @@ class Gdn_CookieIdentity {
    }
    
    protected function _DeleteCookie($CookieName) {
+      unset($_COOKIE[$CookieName]);
       self::DeleteCookie($CookieName, $this->CookiePath, $this->CookieDomain);
    }
    
@@ -264,9 +285,10 @@ class Gdn_CookieIdentity {
 
       if (is_null($Domain))
          $Domain = Gdn::Config('Garden.Cookie.Domain');
-         
-      setcookie($CookieName, 'deleted', 0, $Path, $Domain);
-      setcookie($CookieName, FALSE, 0, $Path, $Domain);
+      
+      $Expiry = strtotime('one year ago');
+      setcookie($CookieName, "", $Expiry, $Path, $Domain);
+      $_COOKIE[$CookieName] = NULL;
    }
    
 }

@@ -66,6 +66,68 @@ class RoleController extends DashboardController {
       }
       $this->Render();
    }
+
+   public function DefaultRoles() {
+      $this->Permission('Garden.Roles.Manage');
+      $this->AddSideMenu('');
+
+      $this->Title(T('Default Roles'));
+
+      // Load roles for dropdowns.
+      $RoleModel = new RoleModel();
+      $this->SetData('RoleData', $RoleModel->Get());
+
+      if ($this->Form->AuthenticatedPostBack() === FALSE) {
+         // Get a list of default member roles from the config.
+         $DefaultRoles = C('Garden.Registration.DefaultRoles');
+         $this->Form->SetValue('DefaultRoles', $DefaultRoles);
+
+         // Get the guest roles.
+         $GuestRolesData = $RoleModel->GetByUserID(0);
+         $GuestRoles = ConsolidateArrayValuesByKey($GuestRolesData, 'RoleID');
+         $this->Form->SetValue('GuestRoles', $GuestRoles);
+
+         // The applicant role.
+         $ApplicantRoleID = C('Garden.Registration.ApplicantRoleID', '');
+         $this->Form->SetValue('ApplicantRoleID', $ApplicantRoleID);
+      } else {
+         $DefaultRoles = $this->Form->GetFormValue('DefaultRoles');
+         $ApplicantRoleID = $this->Form->GetFormValue('ApplicantRoleID');
+         SaveToConfig(array(
+            'Garden.Registration.DefaultRoles' => $DefaultRoles,
+            'Garden.Registration.ApplicantRoleID' => $ApplicantRoleID));
+
+         $GuestRoles = $this->Form->GetFormValue('GuestRoles');
+         $UserModel = new UserModel();
+         $UserModel->SaveRoles(0, $GuestRoles, FALSE);
+
+         $this->StatusMessage = T("Saved");
+      }
+
+      $this->Render();
+   }
+
+   public function DefaultRolesWarning() {
+      // Check to see if there are no default roles for guests or members.
+      $DefaultRolesWarning = FALSE;
+      $DefaultRoles = C('Garden.Registration.DefaultRoles');
+      if (count($DefaultRoles) == 0) {
+         $DefaultRolesWarning = TRUE;
+      } elseif (!C('Garden.Registration.ApplicantRoleID') && C('Garden.Registration.Method') == 'Approval') {
+         $DefaultRolesWarning = TRUE;
+      } else {
+         $RoleModel = new RoleModel();
+         $GuestRoles = $RoleModel->GetByUserID(0);
+         if($GuestRoles->NumRows() == 0)
+            $DefaultRolesWarning = TRUE;
+      }
+
+      if ($DefaultRolesWarning) {
+         echo Wrap(
+            sprintf(T('No default roles.', 'You don\'t have your default roles set up. To correct this problem click %s.'),
+            Anchor(T('here'), 'dashboard/role/defaultroles')), 'div', array('class' => 'Warning'));
+      }
+   }
    
    public function Edit($RoleID = FALSE) {
 		if(!$this->_Permission())
@@ -78,7 +140,7 @@ class RoleController extends DashboardController {
       $PermissionModel = Gdn::PermissionModel();
       $this->Role = $this->RoleModel->GetByRoleID($RoleID);
       // $this->EditablePermissions = is_object($this->Role) ? $this->Role->EditablePermissions : '1';
-      $this->AddJsFile('/js/library/jquery.gardencheckboxgrid.js');
+      $this->AddJsFile('jquery.gardencheckboxgrid.js');
       
       // Set the model on the form.
       $this->Form->SetModel($this->RoleModel);
@@ -112,8 +174,8 @@ class RoleController extends DashboardController {
 		$this->Permission('Garden.Roles.Manage');
 
       $this->AddSideMenu('dashboard/role');
-      $this->AddJsFile('/js/library/jquery.tablednd.js');
-      $this->AddJsFile('/js/library/jquery.ui.packed.js');
+      $this->AddJsFile('jquery.tablednd.js');
+      $this->AddJsFile('jquery.ui.packed.js');
       $this->Title(T('Roles & Permissions'));
       $this->RoleData = $this->RoleModel->Get();
       $this->Render();

@@ -238,7 +238,7 @@ class Gdn_Form {
             ++$i;
          }
       }
-      return '<ul class="CheckBoxList">' . $Return . '</ul>';
+      return '<ul class="'.ConcatSep(' ', 'CheckBoxList', GetValue('listclass', $Attributes)).'">' . $Return . '</ul>';
    }
 
    /**
@@ -540,7 +540,7 @@ class Gdn_Form {
       $Return .= $this->_NameAttribute($FieldName, $Attributes);
       $Return .= $this->_AttributesToString($Attributes);
       $Return .= ">\n";
-      $Value = ArrayValueI('value', $Attributes);
+      $Value = ArrayValueI('Value', $Attributes);
 
       if ($Value === FALSE) $Value = $this->GetValue($FieldName);
 
@@ -630,7 +630,18 @@ class Gdn_Form {
     * @return string
     */
    public function RadioList($FieldName, $DataSet, $Attributes = FALSE) {
+      $List = GetValue('list', $Attributes);
       $Return = '';
+
+      if ($List) {
+         $Return .= '<ul'.(isset($Attributes['listclass']) ? " class=\"{$Attributes['listclass']}\"" : '').'>';
+         $LiOpen = '<li>';
+         $LiClose = '</li>';
+      } else {
+         $LiOpen = '';
+         $LiClose = '';
+      }
+
       if (is_object($DataSet)) {
          $ValueField = ArrayValueI('ValueField', $Attributes, 'value');
          $TextField = ArrayValueI('TextField', $Attributes, 'text');
@@ -639,16 +650,20 @@ class Gdn_Form {
             $TextField)) {
             foreach($DataSet->Result() as $Data) {
                $Attributes['value'] = $Data->$ValueField;
-               $Return .= $this->Radio($FieldName,
-                  $Data->$TextField, $Attributes);
+
+               $Return .= $LiOpen.$this->Radio($FieldName, $Data->$TextField, $Attributes).$LiClose;
             }
          }
       } elseif (is_array($DataSet)) {
          foreach($DataSet as $ID => $Text) {
             $Attributes['value'] = $ID;
-            $Return .= $this->Radio($FieldName, $Text, $Attributes);
+            $Return .= $LiOpen.$this->Radio($FieldName, $Text, $Attributes).$LiClose;
          }
       }
+
+      if ($List)
+         $Return .= '</ul>';
+
       return $Return;
    }
 
@@ -768,11 +783,27 @@ class Gdn_Form {
          $this->Action = Url();
          
       $this->Action = $ActionFromAttributes === FALSE ? $this->Action : $ActionFromAttributes;
-      
+
+      if (!C('Garden.RewriteUrls') && strcasecmp($this->Method, 'get') == 0) {
+         // The path is not getting passed on get forms so put them in hidden fields.
+         $Action = strrchr($this->Action, '?');
+         $this->Action = substr($this->Action, 0, -strlen($Action));
+         parse_str(trim($Action, '?'), $Query);
+         $Hiddens = '';
+         foreach ($Query as $Key => $Value) {
+            $Key = Gdn_Format::Form($Key);
+            $Value = Gdn_Format::Form($Value);
+            $Hiddens .= "\n<input type=\"hidden\" name=\"$Key\" value=\"$Value\" />";
+         }
+      }
+
       $Return .= ' method="' . $this->Method . '"'
          .' action="' . $this->Action . '"'
          .$this->_AttributesToString($Attributes)
          .">\n<div>\n";
+
+      if (isset($Hiddens))
+         $Return .= $Hiddens;
 
       // Postback Key - don't allow it to be posted in the url (prevents csrf attacks & hijacks)
       if ($this->Method != "get") {
@@ -948,11 +979,21 @@ class Gdn_Form {
    public function AddError($Error, $FieldName = '') {
       if(is_string($Error))
          $ErrorCode = $Error;
-      elseif(is_a($Error, 'Exception')) {
+      elseif(is_a($Error, 'Gdn_UserException')) {
+         $ErrorCode = '@'.$Error->getMessage();
+      } elseif(is_a($Error, 'Exception')) {
+         // Strip the extra information out of the exception.
+         $Parts = explode('|', $Error->getMessage());
+         $Message = $Parts[0];
+         if (count($Parts) >= 3)
+            $FileSuffix = ": {$Parts[1]}->{$Parts[2]}(...)";
+         else
+            $FileSuffix = "";
+
          if(defined('DEBUG')) {
             $ErrorCode = '@<pre>'.
-               $Error->getMessage()."\n".
-               $Error->getFile().' Line '.$Error->getLine()."\n".
+               $Message."\n".
+               '## '.$Error->getFile().'('.$Error->getLine().")".$FileSuffix."\n".
                $Error->getTraceAsString().
                '</pre>';
          } else {
@@ -1077,11 +1118,10 @@ class Gdn_Form {
     * @param string $FieldName The field name to escape.
     * @return string
     */
-   public function EscapeFieldName(
-      $FieldName) {
+   public function EscapeFieldName($FieldName) {
       $Return = $this->InputPrefix;
       if ($Return != '') $Return .= '/';
-      return $Return . $this->_EscapeString($FieldName);
+      return $Return . $this->EscapeString($FieldName);
    }
 
    /**
@@ -1170,7 +1210,7 @@ class Gdn_Form {
     * @return boolean
     */
    public function ButtonExists($ButtonCode) {
-      $NameKey = $this->_EscapeString($ButtonCode);
+      $NameKey = $this->EscapeString($ButtonCode);
       return array_key_exists($NameKey, $this->FormValues()) ? TRUE : FALSE;
    }
 
@@ -1499,10 +1539,9 @@ class Gdn_Form {
     * Encodes the string in a php-form safe-encoded format.
     *
     * @param string $String The string to encode.
-    * @return unknown
+    * @return string
     */
-   protected function _EscapeString(
-      $String) {
+   public function EscapeString($String) {
       $Array = FALSE;
       if (substr($String, -2) == '[]') {
          $String = substr($String, 0, -2);

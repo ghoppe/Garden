@@ -51,7 +51,7 @@ class PermissionModel extends Gdn_Model {
 			}
 		}
 
-		$this->SQL->Replace('Permission', $this->_Backtick($DefaultPermissions), array('RoleID' => 0, 'JunctionTable' => $JunctionTable, 'JunctionColumn' => $JunctionColumn));
+		$this->SQL->Replace('Permission', $this->_Backtick($DefaultPermissions), array('RoleID' => 0, 'JunctionTable' => $JunctionTable, 'JunctionColumn' => $JunctionColumn), TRUE);
    }
    
    public function Delete($RoleID = NULL, $JunctionTable = NULL, $JunctionColumn = NULL, $JunctionID = NULL) {
@@ -102,9 +102,8 @@ class PermissionModel extends Gdn_Model {
       $ApplicationManager = new Gdn_ApplicationManager();
       $EnabledApplications = $ApplicationManager->EnabledApplications();
       
-      $PluginManager = Gdn::Factory('PluginManager');
       $PluginNamespaces = array();
-      foreach($PluginManager->EnabledPlugins as $Plugin) {
+      foreach(Gdn::PluginManager()->EnabledPlugins as $Plugin) {
          if(!array_key_exists('RegisterPermissions', $Plugin) || !is_array($Plugin['RegisterPermissions']))
             continue;
          foreach($Plugin['RegisterPermissions'] as $PermissionName) {
@@ -540,7 +539,7 @@ class PermissionModel extends Gdn_Model {
             $Where['JunctionID'] = NULL;
          }
          
-         $this->SQL->Replace('Permission', $this->_Backtick($Values), $Where);
+         $this->SQL->Replace('Permission', $this->_Backtick($Values), $Where, TRUE);
 
 			if($SaveGlobal && !is_null($Where['JunctionTable'])) {
 				// Save these permissions with the global permissions.
@@ -548,7 +547,7 @@ class PermissionModel extends Gdn_Model {
             $Where['JunctionColumn'] = NULL;
             $Where['JunctionID'] = NULL;
 
-				$this->SQL->Replace('Permission', $this->_Backtick($Values), $Where);
+				$this->SQL->Replace('Permission', $this->_Backtick($Values), $Where, TRUE);
 			}
       }
    }

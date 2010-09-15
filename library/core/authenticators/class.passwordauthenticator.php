@@ -51,9 +51,13 @@ class Gdn_PasswordAuthenticator extends Gdn_Authenticator {
     * @param int $ClientHour The current hour (24 hour format) of the client.
     */
    public function Authenticate($Email = '', $Password = '') {
-      if(!$Email || !$Password) {
+      if (!$Email || !$Password) {
+      
+         // We werent given parameters, check if they exist in our DataSource
          if ($this->CurrentStep() != Gdn_Authenticator::MODE_VALIDATE)
             return Gdn_Authenticator::AUTH_INSUFFICIENT;
+         
+         // Get the values from the DataSource
          $Email = $this->GetValue('Email');
          $Password = $this->GetValue('Password');
          $PersistentSession = $this->GetValue('RememberMe');
@@ -90,7 +94,10 @@ class Gdn_PasswordAuthenticator extends Gdn_Authenticator {
             // Update some information about the user...
             $UserModel->UpdateLastVisit($UserID, $UserData->Attributes, $ClientHour);
             
+            Gdn::Authenticator()->Trigger(Gdn_Authenticator::AUTH_SUCCESS);
             $this->FireEvent('Authenticated');
+         } else {
+            Gdn::Authenticator()->Trigger(Gdn_Authenticator::AUTH_DENIED);
          }
       }
       return $UserID;
@@ -126,7 +133,16 @@ class Gdn_PasswordAuthenticator extends Gdn_Authenticator {
       return Gdn_Authenticator::REACT_REDIRECT;
    }
    
+   public function LogoutResponse() {
+      return Gdn_Authenticator::REACT_REDIRECT;
+   }
+   
    public function RepeatResponse() {
+      return Gdn_Authenticator::REACT_RENDER;
+   }
+   
+   // What to do if the entry/auth/* page is triggered but login is denied or fails
+   public function FailedResponse() {
       return Gdn_Authenticator::REACT_RENDER;
    }
    
