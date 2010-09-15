@@ -14,16 +14,12 @@ if ($this->_CategoryData !== FALSE) {
       if (!is_numeric($CategoryID) && $this->_Sender->SelfUrl == "discussions" )
          echo ' class="Active"';
          
-<<<<<<< HEAD
-      ?>><strong><?php echo Anchor(Format::Text(T('All Discussions')), '/discussions'); ?></strong> <?php echo $CountDiscussions; ?></li>
+      ?>><strong><?php echo Anchor(Gdn_Format::Text(T('All Discussions')), '/discussions'); ?></strong> <?php echo $CountDiscussions; ?></li>
  <li<?php
       if (!is_numeric($CategoryID) && $this->_Sender->SelfUrl == "categories")
          echo ' class="Active"';
          
-      ?>><strong><?php echo Anchor(Format::Text(T('All Categories')), '/categories'); ?></strong> <?php echo $CountDiscussions; ?></li>
-=======
-      ?>><strong><?php echo Anchor(Gdn_Format::Text(T('All Discussions')), '/discussions'); ?></strong> <?php echo $CountDiscussions; ?></li>
->>>>>>> upstream/master
+      ?>><strong><?php echo Anchor(Gdn_Format::Text(T('All Categories')), '/categories'); ?></strong> <?php echo $CountDiscussions; ?></li>
       <?php
    foreach ($this->_CategoryData->Result() as $Category) {
       ?>
