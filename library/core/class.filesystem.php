@@ -285,8 +285,9 @@ class Gdn_FileSystem {
     * @param string $File The full path to the file being served.
     * @param string $Name The name to give the file being served (don't include file extension, it will be added automatically). Will use file's name on disk if ignored.
     * @param string $MimeType The mime type of the file.
+    * @param string $ServeMode Whether to download the file as an attachment, or inline
     */
-   public static function ServeFile($File, $Name = '', $MimeType = '') {
+   public static function ServeFile($File, $Name = '', $MimeType = '', $ServeMode = 'attachment') {
       if (is_readable($File)) {
          // Get the db connection and make sure it is closed
          $Database = Gdn::Database();
@@ -296,7 +297,7 @@ class Gdn_FileSystem {
          $Extension = strtolower(pathinfo($File, PATHINFO_EXTENSION));
          if ($Name == '') {
             $Name = pathinfo($File, PATHINFO_FILENAME) . '.' . $Extension;
-         } else {
+         } elseif (!StringEndsWith($Name, '.'.$Extension)) {
             $Name .= '.'.$Extension;
          }
          $Name = rawurldecode($Name);
@@ -330,11 +331,15 @@ class Gdn_FileSystem {
          @ob_end_clean();
          
          // required for IE, otherwise Content-Disposition may be ignored
-         if(ini_get('zlib.output_compression'))
+         if (ini_get('zlib.output_compression'))
             ini_set('zlib.output_compression', 'Off');
          
-         header('Content-Type: ' . $MimeType);
-         header('Content-Disposition: attachment; filename="'.$Name.'"');
+         if ($ServeMode == 'inline')
+            header('Content-Disposition: inline; filename="'.$Name.'"');
+         else
+            header('Content-Disposition: attachment; filename="'.$Name.'"');
+         
+         header('Content-Type: '.$MimeType);
          header("Content-Transfer-Encoding: binary");
          header('Accept-Ranges: bytes');
          header("Cache-control: private");
@@ -352,22 +357,30 @@ class Gdn_FileSystem {
     * @param string $Dir 
     * @return void
     */
-   public static function RemoveFolder($Dir) {
-      // Make sure the directory is properly denoted (otherwise this function
-      // will also delete directories prefixed with $Dir).
-      if (substr($Dir, -1, 1) != '/')
-         $Dir  .= '/';
-         
-      $Files = glob($Dir . '*', GLOB_MARK);
-      
-      foreach ($Files as $File) {
-         if (substr($File, -1) == '/')
-            self::RemoveFolder($File);
-         else
-            unlink($File);
+   public static function RemoveFolder($Path) {
+      if (is_file($Path)) {
+         unlink($Path);
+         return;
       }
 
-      if (is_dir($Dir)) rmdir($Dir);
+      $Path = rtrim($Path, '/').'/';
+
+      // Get all of the files in the directory.
+      if ($dh = opendir($Path)) {
+         while (($File = readdir($dh)) !== false) {
+            if (trim($File, '.') == '')
+               continue;
+
+            $SubPath = $Path.$File;
+
+            if (is_dir($SubPath))
+               self::RemoveFolder($SubPath);
+            else
+               unlink($SubPath);
+         }
+         closedir($dh);
+      }
+      rmdir($Path);
    }
    
    public static function CheckFolderR($Path, $Flags = 0) {
@@ -400,6 +413,83 @@ class Gdn_FileSystem {
             return FALSE;
       }
       return TRUE;
+   }
+   
+    /**
+     * Copy file or folder from source to destination
+     * 
+     * It can do recursive copy as well and is very smart
+     * It recursively creates the dest file or directory path if there weren't exists
+     * Situtaions :
+     * - Src:/home/test/file.txt ,Dst:/home/test/b ,Result:/home/test/b -> If source was file copy file.txt name with b as name to destination
+     * - Src:/home/test/file.txt ,Dst:/home/test/b/ ,Result:/home/test/b/file.txt -> If source was file Creates b directory if does not exsits and copy file.txt into it
+     * - Src:/home/test ,Dst:/home/ ,Result:/home/test/** -> If source was directory copy test directory and all of its content into dest     
+     * - Src:/home/test/ ,Dst:/home/ ,Result:/home/**-> if source was direcotry copy its content to dest
+     * - Src:/home/test ,Dst:/home/test2 ,Result:/home/test2/** -> if source was directoy copy it and its content to dest with test2 as name
+     * - Src:/home/test/ ,Dst:/home/test2 ,Result:->/home/test2/** if source was directoy copy it and its content to dest with test2 as name
+     * 
+     * @author Sina Salek - http://sina.salek.ws/en/contact 
+     * @param $source //file or folder
+     * @param $dest ///file or folder
+     * @param $options //folderPermission,filePermission
+     * @return boolean
+     */
+   public static function Copy($source, $dest, $options=array('folderPermission'=>0755,'filePermission'=>0755)){
+      $result=false;
+
+      if (is_file($source)) {
+         if ($dest[strlen($dest)-1]=='/') {
+             if (!file_exists($dest)) {
+                 cmfcDirectory::makeAll($dest,$options['folderPermission'],true);
+             }
+             $__dest=$dest."/".basename($source);
+         } else {
+             $__dest=$dest;
+         }
+         $result=copy($source, $__dest);
+         chmod($__dest,$options['filePermission']);
+        
+      } elseif(is_dir($source)) {
+         if ($dest[strlen($dest)-1]=='/') {
+             if ($source[strlen($source)-1]=='/') {
+                 //Copy only contents
+             } else {
+                 //Change parent itself and its contents
+                 $dest=$dest.basename($source);
+                 @mkdir($dest);
+                 chmod($dest,$options['filePermission']);
+             }
+         } else {
+             if ($source[strlen($source)-1]=='/') {
+                 //Copy parent directory with new name and all its content
+                 @mkdir($dest,$options['folderPermission']);
+                 chmod($dest,$options['filePermission']);
+             } else {
+                 //Copy parent directory with new name and all its content
+                 @mkdir($dest,$options['folderPermission']);
+                 chmod($dest,$options['filePermission']);
+             }
+         }
+
+         $dirHandle=opendir($source);
+         while($file=readdir($dirHandle))
+         {
+             if($file!="." && $file!="..")
+             {
+                  if(!is_dir($source."/".$file)) {
+                     $__dest=$dest."/".$file;
+                 } else {
+                     $__dest=$dest."/".$file;
+                 }
+                 $result=Gdn_FileSystem::Copy($source."/".$file, $__dest, $options);
+             }
+         }
+         closedir($dirHandle);
+        
+      } else {
+         $result=false;
+      }
+      return $result;
    }
    
 }

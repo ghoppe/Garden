@@ -1,6 +1,15 @@
 <?php if (!defined('APPLICATION')) exit();
 $this->AddSideMenu();
 ?>
+<div class="Help Aside">
+   <?php
+   echo '<h2>', T('Need More Help?'), '</h2>';
+   echo '<ul>';
+   echo '<li>', Anchor(T('Importing to Vanilla'), 'http://vanillaforums.com/porter'), '</li>';
+   echo '<li>', Anchor(T('The Vanilla 2 Exporter'), 'http://vanillaforums.org/addon/porter-core'), '</li>';
+   echo '</ul>';
+   ?>
+</div>
 <h1><?php echo T('Import'); ?></h1>
 <?php
 echo '<div class="Info">'
@@ -62,6 +71,8 @@ echo $this->Form->Errors();
 		
 		echo $this->Form->Label('Password', 'Password'),
 			$this->Form->Input('Password', 'password');
+
+      echo $this->Form->CheckBox('UseCurrentPassword', 'Use My Current Password');
 		?>
 	</li><?php /*
 	<li>

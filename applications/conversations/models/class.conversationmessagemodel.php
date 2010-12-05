@@ -1,4 +1,4 @@
-   <?php if (!defined('APPLICATION')) exit();
+<?php if (!defined('APPLICATION')) exit();
 /*
 Copyright 2008, 2009 Vanilla Forums Inc.
 This file is part of Garden.
@@ -99,6 +99,8 @@ class ConversationMessageModel extends Gdn_Model {
       $MessageID = FALSE;
       if($this->Validate($FormPostValues)) {
          $Fields = $this->Validation->SchemaValidationFields(); // All fields on the form that relate to the schema
+         $Fields['Format'] = C('Conversations.Message.Format','Ham');
+         
          $MessageID = $this->SQL->Insert($this->Name, $Fields);
          $ConversationID = ArrayValue('ConversationID', $Fields, 0);
          $Px = $this->SQL->Database->DatabasePrefix;
@@ -148,10 +150,10 @@ class ConversationMessageModel extends Gdn_Model {
             ->Select('uc.UserID')
             ->From('UserConversation uc')
             ->Where('uc.ConversationID', $ConversationID) // hopefully coax this index.
-            ->Where('uc.LastMessageID', $MessageID)
+            // ->Where('uc.LastMessageID', $MessageID)
             ->Where('uc.UserID <>', $Session->UserID)
             ->Get();
-      
+
          $ActivityModel = new ActivityModel();
          foreach ($UnreadData->Result() as $User) {
             // Notify the users of the new message.
@@ -167,7 +169,6 @@ class ConversationMessageModel extends Gdn_Model {
             $Story = ArrayValue('Body', $Fields, '');
             $ActivityModel->SendNotification($ActivityID, $Story);
          }
-            
       }
       return $MessageID;
    }

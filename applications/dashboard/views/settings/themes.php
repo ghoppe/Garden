@@ -2,14 +2,16 @@
 $Session = Gdn::Session();
 $AddonUrl = Gdn::Config('Garden.AddonUrl');
 ?>
+<div class="Help Aside">
+   <?php
+   echo '<h2>', T('Need More Help?'), '</h2>';
+   echo '<ul>';
+   echo '<li>', Anchor(T('Theming Overview'), 'http://vanillaforums.org/page/Configuration-DashboardAppearanceThemes'), '</li>';
+   echo '<li>', Anchor(T('Quick-Start Guide to Creating Themes for Vanilla'), 'http://vanillaforums.org/page/ThemeQuickStart'), '</li>';
+   echo '</ul>';
+   ?>
+</div>
 <h1><?php echo T('Manage Themes'); ?></h1>
-<?php
-if ($AddonUrl != '')
-   echo '<div class="FilterMenu">',
-      Anchor('Get More Themes', $AddonUrl),
-      '</div>';
-         
-?>
 <div class="Info">
 <?php
 printf(
@@ -17,6 +19,13 @@ printf(
    '<code>'.PATH_THEMES.'</code>'
 );
 ?></div>
+<?php
+if ($AddonUrl != '')
+   echo '<div class="FilterMenu">',
+      Anchor(T('Get More Themes'), $AddonUrl, 'SmallButton'),
+      '</div>';
+         
+?>
 <?php echo $this->Form->Errors(); ?>
 <div class="Messages Errors TestAddonErrors Hidden">
    <ul>
@@ -140,8 +149,8 @@ printf(
                   }
 
                   echo '<div class="Buttons">';
-                  echo Anchor('Apply', 'dashboard/settings/themes/'.$ThemeFolder.'/'.$Session->TransientKey(), 'SmallButton EnableAddon EnableTheme', array('target' => '_top'));
-                  echo Anchor('Preview', 'dashboard/settings/previewtheme/'.$ThemeFolder, 'SmallButton PreviewAddon', array('target' => '_top'));
+                  echo Anchor(T('Apply'), 'dashboard/settings/themes/'.$ThemeFolder.'/'.$Session->TransientKey(), 'SmallButton EnableAddon EnableTheme', array('target' => '_top'));
+                  echo Anchor(T('Preview'), 'dashboard/settings/previewtheme/'.$ThemeFolder, 'SmallButton PreviewAddon', array('target' => '_top'));
 						$this->EventArguments['ThemeInfo'] = $ThemeInfo;
 						$this->FireEvent('AfterThemeButtons');
                   echo '</div>';

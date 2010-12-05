@@ -32,30 +32,32 @@ class ImportModel extends Gdn_Model {
 	public $MaxStepTime = 1; // seconds
 
 	protected $_MergeSteps = array(
-   	1 => 'ProcessImportFile',
-   	2 => 'DefineTables',
-   	3 => 'LoadTables',
-   	4 => 'DefineIndexes',
-   	5 => 'AssignUserIDs',
-   	6 => 'AssignOtherIDs',
-   	7 => 'InsertTables',
-   	8 => 'UpdateCounts',
-      9 => 'CustomFinalization',
-      10 => 'AddActivity'
-	);
-
-	protected $_OverwriteSteps = array(
-   	1 => 'ProcessImportFile',
-   	2 => 'DefineTables',
-   	3 => 'LoadUserTable',
-   	4 => 'AuthenticateAdminUser',
-   	5 => 'InsertUserTable',
-   	6 => 'LoadTables',
-   	7 => 'DeleteOverwriteTables',
+      1 => 'Initialize',
+   	2 => 'ProcessImportFile',
+   	3 => 'DefineTables',
+   	4 => 'LoadTables',
+   	5 => 'DefineIndexes',
+   	6 => 'AssignUserIDs',
+   	7 => 'AssignOtherIDs',
    	8 => 'InsertTables',
    	9 => 'UpdateCounts',
       10 => 'CustomFinalization',
       11 => 'AddActivity'
+	);
+
+	protected $_OverwriteSteps = array(
+      1 => 'Initialize',
+   	2 => 'ProcessImportFile',
+   	3 => 'DefineTables',
+   	4 => 'LoadUserTable',
+   	5 => 'AuthenticateAdminUser',
+   	6 => 'InsertUserTable',
+   	7 => 'LoadTables',
+   	8 => 'DeleteOverwriteTables',
+   	9 => 'InsertTables',
+   	10 => 'UpdateCounts',
+      11 => 'CustomFinalization',
+      12 => 'AddActivity'
    );
 
 	/**
@@ -184,7 +186,11 @@ class ImportModel extends Gdn_Model {
 		} else {
 			$Data = $Data->FirstRow();
 			$PasswordHash = new Gdn_PasswordHash();
-			$Result = $PasswordHash->CheckPassword($OverwritePassword, GetValue('Password', $Data), $this->GetPasswordHashMethod());
+         if (strcasecmp($this->GetPasswordHashMethod(), 'reset') == 0 || $this->Data('UseCurrentPassword')) {
+            $Result = TRUE;
+         } else {
+            $Result = $PasswordHash->CheckPassword($OverwritePassword, GetValue('Password', $Data), $this->GetPasswordHashMethod());
+         }
 		}
 		if(!$Result) {
 			$this->Validation->AddValidationResult('Email', T('ErrorCredentials'));
@@ -199,6 +205,13 @@ class ImportModel extends Gdn_Model {
          $Imp->AfterImport();
 
       return TRUE;
+   }
+
+   public function Data($Key, $Value = NULL) {
+      if ($Value === NULL) {
+         return GetValue($Key, $this->Data);
+      }
+      $this->Data[$Key] = $Value;
    }
 
 	public function DefineTables() {
@@ -325,7 +338,7 @@ class ImportModel extends Gdn_Model {
 	 */
 	public function DeleteOverwriteTables() {
 		$Tables = array('Activity', 'Category', 'Comment', 'Conversation', 'ConversationMessage',
-   		'Discussion', 'Draft', 'Invitation', 'Message', 'Photo', 'Permission', 'Role', 'UserAuthentication',
+   		'Discussion', 'Draft', 'Invitation', 'Media', 'Message', 'Photo', 'Permission', 'Role', 'UserAuthentication',
    		'UserComment', 'UserConversation', 'UserDiscussion', 'UserMeta', 'UserRole');
 
       // Delete the default role settings.
@@ -338,6 +351,13 @@ class ImportModel extends Gdn_Model {
 		$CurrentSubstep = GetValue('CurrentSubstep', $this->Data, 0);
 		for($i = $CurrentSubstep; $i < count($Tables); $i++) {
 			$Table = $Tables[$i];
+
+         // Make sure the table exists.
+         $Exists = Gdn::Structure()->Table($Table)->TableExists();
+         Gdn::Structure()->Reset();
+         if (!$Exists)
+            continue;
+
          $this->Data['CurrentStepMessage'] = $Table;
          
 			if($Table == 'Permission')
@@ -369,6 +389,7 @@ class ImportModel extends Gdn_Model {
          $this->Data['OverwriteEmail'] = $Post['Email'];
       if(isset($Post['Password'])) {
          $this->Data['OverwritePassword'] = $Post['Password'];
+         $this->Data['UseCurrentPassword'] = GetValue('UseCurrentPassword', $Post);
       }
    }
 
@@ -427,6 +448,7 @@ class ImportModel extends Gdn_Model {
       $Post['Overwrite'] = GetValue('Overwrite', $D, 'Overwrite');
       $Post['Email'] = GetValue('OverwriteEmail', $D, '');
       $Post['Password'] = GetValue('OverwritePassword', $D, '');
+      $Post['UseCurrentPassword'] = GetValue('UseCurrentPassword', $D, FALSE);
    }
 
    public static function FGetCSV2($fp, $Delim = ',', $Quote = '"', $Escape = "\\") {
@@ -551,6 +573,12 @@ class ImportModel extends Gdn_Model {
       return $Exists !== FALSE;
    }
 
+   public function Initialize() {
+      // This is just a dummy step so the ajax can get going right away.
+
+      return TRUE;
+   }
+
 	public function InsertTables() {
 		$InsertedCount = 0;
 		$Timer = new Gdn_Timer();
@@ -626,6 +654,10 @@ class ImportModel extends Gdn_Model {
 		return $Result;
 	}
 
+   protected static function BackTick($Str) {
+      return '`'.str_replace('`', '\`', $Str).'`';
+   }
+
 	protected function _InsertTable($TableName, $Sets = array()) {
 		if(!array_key_exists($TableName, $this->Tables()))
 			return;
@@ -635,7 +667,7 @@ class ImportModel extends Gdn_Model {
 
 		// Build the column insert list.
 		$Insert = "insert ignore :_$TableName (\n  "
-		.implode(",\n  ", array_keys(array_merge($Columns, $Sets)))
+		.implode(",\n  ", array_map(array('ImportModel', 'BackTick'), array_keys(array_merge($Columns, $Sets))))
 		."\n)";
 		$From = "from :_z$TableName i";
 		$Where = '';
@@ -643,9 +675,11 @@ class ImportModel extends Gdn_Model {
 		// Build the select list for the insert.
 		$Select = array();
 		foreach($Columns as $Column => $X) {
+         $BColumn = self::BackTick($Column);
+
 			if(strcasecmp($this->Overwrite(), 'Overwrite') == 0) {
 				// The data goes in raw.
-				$Select[] = "i.$Column";
+				$Select[] = "i.$BColumn";
 			} elseif($Column == $TableName.'ID') {
 				// This is the primary key.
 				$Select[] = "i._NewID as $Column";
@@ -662,7 +696,7 @@ class ImportModel extends Gdn_Model {
 				}
 			} else {
 				// This is a straight columns insert.
-				$Select[] = "i.$Column";
+				$Select[] = "i.$BColumn";
 			}
 		}
 		// Add the original table to prevent duplicates.
@@ -704,6 +738,8 @@ class ImportModel extends Gdn_Model {
 	}
 
 	public function InsertUserTable() {
+      $UserCurrentPassword = $this->Data('UseCurrentPassword');
+
 		// Delete the current user table.
 		$this->Query('truncate table :_User');
 
@@ -712,9 +748,33 @@ class ImportModel extends Gdn_Model {
 		$this->_InsertTable('User', array('HashMethod' => $this->GetPasswordHashMethod()));
 		$UserTableInfo['Inserted'] = TRUE;
 
-		// Set the admin user flag.
-		$AdminEmail = GetValue('OverwriteEmail', $this->Data);
-		$this->Query('update :_User set Admin = 1 where Email = :Email', array(':Email' => $AdminEmail));
+      $AdminEmail = GetValue('OverwriteEmail', $this->Data);
+      $SqlArgs = array(':Email' => $AdminEmail);
+      $SqlSet = '';
+
+      if ($UserCurrentPassword) {
+         $SqlArgs[':Password'] = Gdn::Session()->User->Password;
+         $SqlArgs[':HashMethod'] = Gdn::Session()->User->HashMethod;
+         $SqlSet = ', Password = :Password, HashMethod = :HashMethod';
+      }
+
+      // If doing a password reset, save out the new admin password:
+      if (strcasecmp($this->GetPasswordHashMethod(), 'reset') == 0) {
+         if (!isset($SqlArgs[':Password'])) {
+            $PasswordHash = new Gdn_PasswordHash();
+            $Hash = $PasswordHash->HashPassword(GetValue('OverwritePassword', $this->Data));
+            $SqlSet .= ', Password = :Password, HashMethod = :HashMethod';
+            $SqlArgs[':Password'] = $Hash;
+            $SqlArgs[':HashMthod'] = 'Vanilla';
+         }
+
+         // Write it out.
+         
+         $this->Query("update :_User set Admin = 1{$SqlSet} where Email = :Email", $SqlArgs);
+      } else {
+         // Set the admin user flag.
+         $this->Query("update :_User set Admin = 1{$SqlSet} where Email = :Email", $SqlArgs);
+      }
 
 		// Authenticate the admin user as the current user.
 		$PasswordAuth = Gdn::Authenticator()->AuthenticateWith('password');
@@ -924,6 +984,9 @@ class ImportModel extends Gdn_Model {
       $St->Table(self::TABLE_PREFIX.'Test')->Column('ID', 'int')->Set(TRUE, TRUE);
 
       // Create a test file to load.
+      if (!file_exists(PATH_UPLOADS.'/import'))
+         mkdir(PATH_UPLOADS.'/import');
+
       $TestPath = PATH_UPLOADS.'/import/test.txt';
       $TestValue = 123;
       $TestContents = 'ID'.self::NEWLINE.$TestValue.self::NEWLINE;
@@ -1003,6 +1066,9 @@ class ImportModel extends Gdn_Model {
 	}
 	
 	public function ProcessImportFile() {
+      // This one step can take a while so give it more time.
+      set_time_limit(60 * 5);
+
 		$Path = $this->ImportPath;
 		$Tables = array();
 
@@ -1178,6 +1244,9 @@ class ImportModel extends Gdn_Model {
 	}
 
    public function UpdateCounts() {
+      // This option could take a while so set the timeout.
+      set_time_limit(60*5);
+      
       // Define the necessary SQL.
       $Sqls = array();
 
@@ -1217,6 +1286,14 @@ class ImportModel extends Gdn_Model {
          join :_Comment c
             on d.FirstCommentID = c.CommentID
          set d.Body = c.Body, d.Format = c.Format";
+
+         if ($this->ImportExists('Media') && Gdn::Structure()->TableExists('Media')) {
+            // Comment Media has to go onto the discussion.
+            $Sqls['Media.Foreign'] = "update :_Media m
+            join :_Discussion d
+               on d.FirstCommentID = m.ForeignID and m.ForeignTable = 'comment'
+            set m.ForeignID = d.DiscussionID, m.ForeignTable = 'discussion'";
+         }
 
          $Sqls['Comment.FirstComment.Delete'] = "delete :_Comment c
          from :_Comment c

@@ -1,4 +1,11 @@
 <?php if (!defined('APPLICATION')) exit();
+/**
+ * Vanilla database structure
+ *
+ * Called by VanillaHooks::Setup() to update database upon enabling app.
+ *
+ * @package Vanilla
+ */
 
 if (!isset($Drop))
    $Drop = FALSE;
@@ -324,31 +331,6 @@ if (!$CountBookmarksExists) {
 if ($FirstCommentIDExists)
    $Construct->Query("update {$Prefix}Discussion set LastCommentID = null where LastCommentID = FirstCommentID");
 
-/*
-    May 12th, 2010
-    Added ability to disable category-level permissions. Update global permissions in case this option is in effect.
- */
-$Construct->Query("update {$Prefix}Permission p2
-   inner join {$Prefix}Category c
-    on c.CategoryID = p2.JunctionID
-       and p2.JunctionTable = 'Category'
-      and c.Name = 'General'
-   inner join {$Prefix}Permission p
-     on p.RoleID = p2.RoleID
-       and p.JunctionTable is null
-   set
-      p.`Vanilla.Discussions.Add` = p2.`Vanilla.Discussions.Add`,
-      p.`Vanilla.Discussions.Edit` = p2.`Vanilla.Discussions.Edit`,
-      p.`Vanilla.Discussions.Announce` = p2.`Vanilla.Discussions.Announce`,
-      p.`Vanilla.Discussions.Sink` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Discussions.Close` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Discussions.Delete` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Discussions.View` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Comments.Add` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Comments.Edit` = p2.`Vanilla.Discussions.Sink`,
-      p.`Vanilla.Comments.Delete` = p2.`Vanilla.Discussions.Sink`
-   where p.RoleID <> 0;");
-
 // This is the final structure of the discussion table after removed & updated columns.
 if ($FirstCommentIDExists) {
    $Construct->Table('Discussion')->DropColumn('FirstCommentID');
@@ -358,6 +340,7 @@ if ($FirstCommentIDExists) {
 $Construct->Table('TagDiscussion')
    ->Column('TagID', 'int', FALSE, 'primary')
    ->Column('DiscussionID', 'int', FALSE, 'primary')
+   ->Engine('InnoDB')
    ->Set($Explicit, $Drop);
 
 $Construct->Table('Tag')

@@ -32,7 +32,7 @@ if ($Session->IsValid()) {
    ?></div>
 </div>
 <?php
-   //echo $this->Pager->ToString('less');
+   $this->FireEvent('BeforeDiscussion');
    echo $this->RenderAsset('DiscussionBefore');
 ?>
 <ul class="MessageList Discussion">
@@ -57,14 +57,20 @@ if ($this->Discussion->Closed == '1') {
       <div class="Note Closed"><?php echo T('This discussion has been closed.'); ?></div>
       <?php echo Anchor(T('&larr; All Discussions'), 'discussions', 'TabLink'); ?>
    </div>
-<?php
-} else if ($Session->IsValid()) { 
+   <?php
+} else if ($Session->IsValid() && $Session->CheckPermission('Vanilla.Comments.Add', TRUE, 'Category', $this->Discussion->CategoryID)) { 
    echo $this->FetchView('comment', 'post');
+} else if ($Session->IsValid()) { ?>
+   <div class="Foot Closed">
+      <div class="Note Closed"><?php echo T('Commenting not allowed.'); ?></div>
+      <?php echo Anchor(T('&larr; All Discussions'), 'discussions', 'TabLink'); ?>
+   </div>
+   <?php
 } else {
-?>
+   ?>
    <div class="Foot">
       <?php
-      echo Anchor(T('Add a Comment'), Gdn::Authenticator()->SignInUrl($this->SelfUrl), 'TabLink'.(C('Garden.SignIn.Popup') ? ' SignInPopup' : ''));
+      echo Anchor(T('Add a Comment'), Gdn::Authenticator()->SignInUrl($this->SelfUrl.'#Form_Body'), 'TabLink'.(SignInPopup() ? ' SignInPopup' : ''));
       ?> 
    </div>
    <?php 

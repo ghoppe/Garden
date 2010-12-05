@@ -47,6 +47,13 @@ class Gdn_ThemeManager {
                      
                   $Folder = substr($Folder, 0, strpos($Folder, DS));
                   $ThemeInfo[$ThemeName]['Folder'] = $Folder;
+
+                  // Add the screenshot.
+                  $ScreenshotPath = SafeGlob(PATH_THEMES."/$Folder/screenshot.*", array('gif', 'jpg', 'png'));
+                  if (count($ScreenshotPath) > 0) {
+                     $ScreenshotPath = $ScreenshotPath[0];
+                     $ThemeInfo[$ThemeName]['ScreenshotUrl'] = Asset(str_replace(PATH_ROOT, '', $ScreenshotPath));
+                  }
                }
             }
          }
@@ -159,7 +166,9 @@ class Gdn_ThemeManager {
       // If there is a hooks in the old theme, include it and run the ondisable method.
       if (class_exists($OldClassName)) {
          $ThemeHooks = new $OldClassName();
-         $ThemeHooks->OnDisable();
+         if (method_exists($ThemeHooks, 'OnDisable')) {
+            $ThemeHooks->OnDisable();
+         }
       }
 
       return TRUE;

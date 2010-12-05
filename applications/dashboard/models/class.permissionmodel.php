@@ -30,26 +30,20 @@ class PermissionModel extends Gdn_Model {
       
       $Structure = $this->Database->Structure();
       $Structure->Table('Permission');
+      $DefaultPermissions = array();
       
       foreach($PermissionNames as $Key => $Value) {
-			if(is_numeric($Key))
+			if(is_numeric($Key)) {
 				$PermissionName = $Value;
-			else
+            $DefaultPermissions[$PermissionName] = 2;
+			} else {
 				$PermissionName = $Key;
+            $DefaultPermissions[$PermissionName] = $Value ? 3 : 2;
+         }
          // Define the column.
          $Structure->Column($PermissionName, $Type, 0);
       }
       $Structure->Set(FALSE, FALSE);
-      
-      // Set the default permissions so we know how to administer them.
-		if(array_key_exists(0, $PermissionNames)) {
-			$DefaultPermissions = array_fill_keys($PermissionNames, 2);
-		} else {
-			$DefaultPermissions = array();
-			foreach($PermissionNames as $PermissionName => $Default) {
-				$DefaultPermissions[$PermissionName] = $Default ? 3 : 2;
-			}
-		}
 
 		$this->SQL->Replace('Permission', $this->_Backtick($DefaultPermissions), array('RoleID' => 0, 'JunctionTable' => $JunctionTable, 'JunctionColumn' => $JunctionColumn), TRUE);
    }
@@ -550,6 +544,11 @@ class PermissionModel extends Gdn_Model {
 				$this->SQL->Replace('Permission', $this->_Backtick($Values), $Where, TRUE);
 			}
       }
+      
+      // Remove the cached permissions for all users.
+      $this->SQL->Update('User')
+         ->Set('Permissions', '')
+         ->Put();
    }
    
    public function SaveAll($Permissions, $AllWhere = NULL) {

@@ -47,8 +47,9 @@ class ProfileController extends Gdn_Controller {
       parent::Initialize();
    }   
    
-   public function Activity($UserReference = '', $Username = '') {
-      $this->GetUserInfo($UserReference, $Username);
+   public function Activity($UserReference = '', $Username = '', $UserID = '') {
+      $this->Permission('Garden.Profiles.View');
+      $this->GetUserInfo($UserReference, $Username, $UserID);
       $this->SetTabView('Activity');
       $this->ActivityModel = new ActivityModel();
       $Session = Gdn::Session();
@@ -136,8 +137,7 @@ class ProfileController extends Gdn_Controller {
       if ($Session->UserID != $this->User->UserID)
          $this->Permission('Garden.Users.Edit');
       
-      $this->CanEditUsername = TRUE;
-      $this->CanEditUsername = $this->CanEditUsername & Gdn::Config("Garden.Profile.EditUsernames");
+      $this->CanEditUsername = Gdn::Config("Garden.Profile.EditUsernames");
       $this->CanEditUsername = $this->CanEditUsername | $Session->CheckPermission('Garden.Users.Edit');
          
       $UserModel = Gdn::UserModel();
@@ -170,8 +170,8 @@ class ProfileController extends Gdn_Controller {
       $this->Render();
    }
 
-   public function Index($UserReference = '', $Username = '') {
-      return $this->Activity($UserReference, $Username);
+   public function Index($User = '', $Username = '', $UserID = '') {
+      return $this->Activity($User, $Username, $UserID);
    }
    
    public function Invitations() {
@@ -308,14 +308,17 @@ class ProfileController extends Gdn_Controller {
          if ($this->Form->ErrorCount() == 0)
             Redirect('dashboard/profile/'.$UserReference);
       }
+		if ($this->Form->ErrorCount() > 0)
+			$this->DeliveryType(DELIVERY_TYPE_ALL);
+
       $this->Render();
    }
    
-   public function Preferences($UserReference = '', $Username = '') {
+   public function Preferences($UserReference = '', $Username = '', $UserID = '') {
       $Session = Gdn::Session();
       $this->Permission('Garden.SignIn.Allow');
-      $this->GetUserInfo($UserReference, $Username);
-      $UserPrefs = Gdn_Format::Unserialize($this->User->Preferences);
+      $this->GetUserInfo($UserReference, $Username, $UserID);
+		$UserPrefs = Gdn_Format::Unserialize($this->User->Preferences);
       if (!is_array($UserPrefs))
          $UserPrefs = array();
 
@@ -403,7 +406,7 @@ class ProfileController extends Gdn_Controller {
       $this->Invitations();
    }
    
-   public function Thumbnail() {
+   public function Thumbnail($UserReference = '', $Username = '') {
       $this->Permission('Garden.SignIn.Allow');
       $this->AddJsFile('jquery.jcrop.pack.js');
       $this->AddJsFile('profile.js');
@@ -411,8 +414,12 @@ class ProfileController extends Gdn_Controller {
       $Session = Gdn::Session();
       if (!$Session->IsValid())
          $this->Form->AddError('You must be authenticated in order to use this form.');
-         
-      $this->GetUserInfo();
+               
+      $this->GetUserInfo($UserReference, $Username);
+      
+      if ($this->User->UserID != $Session->UserID && !$Session->CheckPermission('Garden.Users.Edit'))
+         throw new Exception(T('You cannot edit the thumbnail of another member.'));
+      
       $this->Form->SetModel($this->UserModel);
       $this->Form->AddHidden('UserID', $this->User->UserID);
       
@@ -424,7 +431,7 @@ class ProfileController extends Gdn_Controller {
       
       // Define the source (profile sized) picture & dimensions.
       if (preg_match('`https?://`i', $this->User->Photo)) {
-         $this->Form->AddError('You cannont edit the thumbnail of an externally linked profile picture.');
+         $this->Form->AddError('You cannot edit the thumbnail of an externally linked profile picture.');
          $this->SourceSize = 0;
       } else {
          $Source = PATH_ROOT.'/uploads/'.ChangeBasename($this->User->Photo, 'p%s');
@@ -538,8 +545,11 @@ class ProfileController extends Gdn_Controller {
             }
             
             // Add profile options for everyone
-            if ($this->User->Photo != '' && $AllowImages)
-               $SideMenu->AddLink('Options', T('Change Picture'), '/profile/picture/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name), 'Garden.Users.Edit', array('class' => 'PictureLink'));
+            $SideMenu->AddLink('Options', T('Change Picture'), '/profile/picture/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name), 'Garden.Users.Edit', array('class' => 'PictureLink'));
+            if ($this->User->Photo != '' && $AllowImages) {
+               $SideMenu->AddLink('Options', T('Edit Thumbnail'), '/profile/thumbnail/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name), 'Garden.Users.Edit', array('class' => 'ThumbnailLink'));
+               $SideMenu->AddLink('Options', T('Remove Picture'), '/profile/removepicture/'.$this->User->UserID.'/'.Gdn_Format::Url($this->User->Name).'/'.$Session->TransientKey(), 'Garden.Users.Edit', array('class' => 'RemovePictureLink'));
+            }
             
             $SideMenu->AddLink('Options', T('Edit Account'), '/user/edit/'.$this->User->UserID, 'Garden.Users.Edit', array('class' => 'Popup'));
             $SideMenu->AddLink('Options', T('Delete Account'), '/user/delete/'.$this->User->UserID, 'Garden.Users.Delete');
@@ -613,14 +623,48 @@ class ProfileController extends Gdn_Controller {
       return TRUE;
    }
 
+   public function Get($UserID = FALSE) {
+      if (!$UserID)
+         $UserID = Gdn::Session()->UserID;
+
+      if (($UserID != Gdn::Session()->UserID || !Gdn::Session()->UserID) && !Gdn::Session()->CheckPermission('Garden.Users.Edit')) {
+         throw new Exception(T('You do not have permission to view other profiles.'), 401);
+      }
+
+      $UserModel = new UserModel();
+
+      // Get the user.
+      $User = $UserModel->GetID($UserID, DATASET_TYPE_ARRAY);
+      if (!$User) {
+         throw new Exception(T('User not found.'), 404);
+      }
+
+      $PhotoUrl = $User['Photo'];
+      if ($PhotoUrl && strpos($PhotoUrl, '//') == FALSE) {
+         $PhotoUrl = Url('/uploads/'.ChangeBasename($PhotoUrl, 'n%s'), TRUE);
+      }
+      $User['Photo'] = $PhotoUrl;
+
+      // Remove unwanted fields.
+      $this->Data = ArrayTranslate($User, array('UserID', 'Name', 'Email', 'Photo'));
+
+      $this->Render();
+   }
+
    /**
     * Retrieve the user to be manipulated. If no params are passed, this will
     * retrieve the current user from the session.
     */
-   public function GetUserInfo($UserReference = '', $Username = '') {
+   public function GetUserInfo($UserReference = '', $Username = '', $UserID = '') {
       if (!C('Garden.Profile.Public') && !Gdn::Session()->IsValid())
          Redirect('dashboard/home/permission');
-         
+      
+		// If a UserID was provided as a querystring parameter, use it over anything else:
+		if ($UserID) {
+			$UserReference = $UserID;
+			$Username = 'Unknown'; // Fill this with a value so the $UserReference is assumed to be an integer/userid.
+		}
+		   
       $this->Roles = array();
       if ($UserReference == '') {
          $this->User = $this->UserModel->Get(Gdn::Session()->UserID);
@@ -631,13 +675,16 @@ class ProfileController extends Gdn_Controller {
       }
          
       if ($this->User === FALSE) {
-         Redirect('dashboard/home/filenotfound');
+         throw NotFoundException();
       } else if ($this->User->Deleted == 1) {
          Redirect('dashboard/home/deleted');
       } else {
          $this->RoleData = $this->UserModel->GetRoles($this->User->UserID);
          if ($this->RoleData !== FALSE && $this->RoleData->NumRows(DATASET_TYPE_ARRAY) > 0) 
             $this->Roles = ConsolidateArrayValuesByKey($this->RoleData->Result(), 'Name');
+			
+			$this->SetData('Profile', $this->User);
+			$this->SetData('UserRoles', $this->Roles);
       }
       
       // Make sure the userphoto module gets added to the page
@@ -668,7 +715,7 @@ class ProfileController extends Gdn_Controller {
          $this->ControllerName = $Controller;
          $this->ApplicationFolder = $Application;
       }
-      $this->_CurrentTab = $CurrentTab;
+		$this->_CurrentTab = T($CurrentTab);
    }
    
 }

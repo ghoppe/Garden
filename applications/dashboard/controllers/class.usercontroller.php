@@ -91,7 +91,7 @@ class UserController extends DashboardController {
          $NewUserID = $this->Form->Save(array('SaveRoles' => TRUE));
          if ($NewUserID !== FALSE) {
             $Password = $this->Form->GetValue('Password', '');
-            $UserModel->SendWelcomeEmail($NewUserID, $Password);
+            $UserModel->SendWelcomeEmail($NewUserID, $Password, 'Add');
             $this->StatusMessage = T('The user has been created successfully');
             $this->RedirectUrl = Url('dashboard/user');
          }
@@ -210,7 +210,7 @@ class UserController extends DashboardController {
       $Available = TRUE;
       if ($Email != '') {
          $UserModel = Gdn::UserModel();
-         if ($UserModel->GetByEmail($Email))
+         if ($UserModel->GetByEmail(urldecode($Email)))
             $Available = FALSE;
       }
       if (!$Available)
@@ -236,6 +236,9 @@ class UserController extends DashboardController {
 
    public function Delete($UserID = '', $Method = '') {
       $this->Permission('Garden.Users.Delete');
+      $Session = Gdn::Session();
+      if($Session->User->UserID == $UserID)
+         trigger_error(ErrorMessage("You cannot delete the user you are logged in as.", $this->ClassName, 'FetchViewLocation'), E_USER_ERROR);
       $this->AddSideMenu('dashboard/user');
       $this->Title(T('Delete User'));
 

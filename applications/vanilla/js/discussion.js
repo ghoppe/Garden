@@ -10,12 +10,6 @@ jQuery(document).ready(function($) {
    // Hijack the "Cancel" button on the comment form
    var cancelButton = $('a.Cancel');
       
-   // Reveal it if they start typing a comment
-   /*
-   $('div.CommentForm textarea').focus(function() {
-      $('a.Cancel:hidden').show();
-   });
-   */
    // Hide it if they leave the area without typing
    $('div.CommentForm textarea').blur(function(ev) {
       var Comment = $(ev.target).val();
@@ -25,9 +19,14 @@ jQuery(document).ready(function($) {
    
    // Reveal the textarea and hide previews.
    $('a.WriteButton, a.Cancel').livequery('click', function() {
+      if ($(this).hasClass('WriteButton')) {
+         var frm = $(this).parents('.MessageForm').find('form');
+         frm.trigger('WriteButtonClick', [frm]);
+      }
+
       resetCommentForm(this);
       if ($(this).hasClass('Cancel'))
-         clearCommentForm(this);   
+         clearCommentForm(this);
 
       return false;
    });
@@ -149,6 +148,7 @@ jQuery(document).ready(function($) {
                $(frm).prepend(json.StatusMessage);
                json.StatusMessage = null;
             } else if (preview) {
+               $(frm).trigger('PreviewLoaded', [frm]);
                $(parent).find('li.Active').removeClass('Active');
                $(btn).parents('li').addClass('Active');
                $(frm).find('textarea').after(json.Data);
@@ -217,7 +217,7 @@ jQuery(document).ready(function($) {
       if (draftInp.val() != '')
          $.ajax({
             type: "POST",
-            url: gdn.combinePaths(gdn.definition('WebRoot'), 'index.php?p=/vanilla/drafts/delete/' + draftInp.val() + '/' + gdn.definition('TransientKey')),
+            url: gdn.url('/vanilla/drafts/delete/' + draftInp.val() + '/' + gdn.definition('TransientKey')),
             data: 'DeliveryType=BOOL&DeliveryMethod=JSON',
             dataType: 'json'
          });         
@@ -315,7 +315,7 @@ jQuery(document).ready(function($) {
          
          $.ajax({
             type: "POST",
-            url: gdn.combinePaths(gdn.definition('WebRoot', ''), 'index.php?p=/discussion/getnew/' + discussionID + '/' + lastCommentID),
+            url: gdn.url('/discussion/getnew/' + discussionID + '/' + lastCommentID),
             data: "DeliveryType=ASSET&DeliveryMethod=JSON",
             dataType: "json",
             error: function(XMLHttpRequest, textStatus, errorThrown) {

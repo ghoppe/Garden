@@ -41,19 +41,24 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
    const AUTH_PARTIAL         = -3;
    const AUTH_SUCCESS         = -4;
    const AUTH_ABORTED         = -5;
+   const AUTH_CREATED         = -6;
    
    const HANDSHAKE_JS         = 'javascript';
    const HANDSHAKE_DIRECT     = 'direct';
    const HANDSHAKE_IMAGE      = 'image';
    
-   const REACT_RENDER         = 0;
-   const REACT_EXIT           = 1;
-   const REACT_REDIRECT       = 2;
-   const REACT_REMOTE         = 3;
+   const REACT_RENDER         = 1;
+   const REACT_EXIT           = 2;
+   const REACT_REDIRECT       = 3;
+   const REACT_REMOTE         = 4;
    
    const URL_REGISTER         = 'RegisterUrl';
    const URL_SIGNIN           = 'SignInUrl';
    const URL_SIGNOUT          = 'SignOutUrl';
+   
+   const URL_REMOTE_REGISTER  = 'RemoteRegisterUrl';
+   const URL_REMOTE_SIGNIN    = 'RemoteSignInUrl';
+   const URL_REMOTE_SIGNOUT   = 'RemoteSignOutUrl';
    
    const KEY_TYPE_TOKEN       = 'token';
    const KEY_TYPE_PROVIDER    = 'provider';
@@ -91,10 +96,10 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
    abstract public function RepeatResponse();
    
    // What to do if the entry/leave/* page is triggered for a user that is logged in and successfully logs out
-   abstract public function LogoutResponse();
+   public function LogoutResponse() { }
    
    // What to do if the entry/auth/* page is triggered but login is denied or fails
-   abstract public function FailedResponse();
+   public function FailedResponse() { }
    
    // Get one of the three Forwarding URLs (Registration, SignIn, SignOut)
    abstract public function GetURL($URLType);
@@ -169,7 +174,10 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
          if (!is_null($ProviderKey)) {
             $ProviderData = $AuthModel->GetProviderByKey($ProviderKey);
          } else {
-            $ProviderData = $AuthModel->GetProviderByScheme($AuthenticationSchemeAlias, $UserID);
+            $ProviderData = $AuthModel->GetProviderByScheme($AuthenticationSchemeAlias, Gdn::Session()->UserID);
+            if (!$ProviderData && Gdn::Session()->UserID > 0) {
+               $ProviderData = $AuthModel->GetProviderByScheme($AuthenticationSchemeAlias, NULL);
+            }
          }
          
          if ($ProviderData)
@@ -223,21 +231,28 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
       $TokenSecret = sha1(md5(implode('.',array($TokenKey,mt_rand(0,100000)))));
       $Timestamp = time();
       
+      $Lifetime = Gdn::Config('Garden.Authenticators.handshake.TokenLifetime', 60);
+      if ($Lifetime == 0 && $TokenType == 'request')
+         $Lifetime = 300;
+      
       $InsertArray = array(
          'Token' => $TokenKey,
          'TokenSecret' => $TokenSecret,
          'TokenType' => $TokenType,
          'ProviderKey' => $ProviderKey,
-         'Lifetime' => Gdn::Config('Garden.Authenticators.handshake.TokenLifetime', 60),
-         'Timestamp' => date('Y-m-d H:i:s',$Timestamp),
-         'Authorized' => $Authorized
+         'Lifetime' => $Lifetime,
+         'Authorized' => $Authorized,
+         'ForeignUserKey' => NULL
       );
       
       if ($UserKey !== NULL)
          $InsertArray['ForeignUserKey'] = $UserKey;
       
       try {
-         Gdn::Database()->SQL()->Insert('UserAuthenticationToken', $InsertArray);
+         Gdn::SQL()
+            ->Set('Timestamp', 'NOW()', FALSE)
+            ->Insert('UserAuthenticationToken', $InsertArray);
+            
          if ($TokenType == 'access' && !is_null($UserKey))
             $this->DeleteToken($ProviderKey, $UserKey, 'request');
       } catch(Exception $e) {
@@ -245,6 +260,16 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
       }
          
       return $InsertArray;
+   }
+   
+   public function AuthorizeToken($TokenKey) {
+      try {
+         Gdn::Database()->SQL()->Update('UserAuthenticationToken uat')
+            ->Set('Authorized',1)
+            ->Where('Token', $TokenKey)
+            ->Put();
+      } catch (Exception $e) { return FALSE; }
+      return TRUE;
    }
    
    public function LookupToken($ProviderKey, $UserKey, $TokenType = NULL) {
@@ -285,16 +310,17 @@ abstract class Gdn_Authenticator extends Gdn_Pluggable {
       
       try {
          $NumAffected = Gdn::Database()->SQL()->Update('UserAuthenticationNonce')
-            ->Set('Nonce', $Nonce)
+            ->Set('Nonce', $InsertArray['Nonce'])
             ->Set('Timestamp', $InsertArray['Timestamp'])
             ->Where('Token', $InsertArray['Token'])
             ->Put();
          
-         if (!$NumAffected)
+         if (!$NumAffected || !$NumAffected->PDOStatement() || !$NumAffected->PDOStatement()->rowCount()) {
             throw new Exception("Nothing to update."); 
+         }
             
       } catch (Exception $e) {
-         Gdn::Database()->SQL()->Insert('UserAuthenticationNonce', $InsertArray);
+         $Inserted = Gdn::Database()->SQL()->Insert('UserAuthenticationNonce', $InsertArray);
       }
       return TRUE;
    }

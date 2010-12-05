@@ -73,6 +73,11 @@ class Gdn_ApplicationManager {
                }
             }
          }
+         // Add all of the indexes to the applications.
+         foreach ($ApplicationInfo as $Index => &$Info) {
+            $Info['Index'] = $Index;
+         }
+
          $this->_AvailableApplications = $ApplicationInfo;
       }
 
@@ -80,7 +85,8 @@ class Gdn_ApplicationManager {
    }
 
    /**
-    * @todo Undocumented method.
+    * Gets an array of all of the enabled applications.
+    * @return array
     */
    public function EnabledApplications() {
       if (!is_array($this->_EnabledApplications)) {
@@ -90,6 +96,7 @@ class Gdn_ApplicationManager {
             $EnabledApplications[$Name] = array('Folder' => $Folder);
             //$EnabledApplications[$Name]['Version'] = Gdn::Config($Name.'.Version', '');
             $EnabledApplications[$Name]['Version'] = '';
+            $EnabledApplications[$Name]['Index'] = $Name;
             // Get the application version from it's about file.
             $AboutPath = PATH_APPLICATIONS.'/'.strtolower($Name).'/settings/about.php';
             if (file_exists($AboutPath)) {
@@ -166,14 +173,17 @@ class Gdn_ApplicationManager {
     */
    public function EnableApplication($ApplicationName, $Validation) {
       $this->TestApplication($ApplicationName, $Validation);
-      $ApplicationFolder = ArrayValue('Folder', ArrayValue($ApplicationName, $this->AvailableApplications(), array()), '');
+      $ApplicationInfo = ArrayValueI($ApplicationName, $this->AvailableApplications(), array());
+      $ApplicationName = $ApplicationInfo['Index'];
+      $ApplicationFolder = ArrayValue('Folder', $ApplicationInfo, '');
       SaveToConfig('EnabledApplications'.'.'.$ApplicationName, $ApplicationFolder);
       return TRUE;
    }
 
    public function TestApplication($ApplicationName, &$Validation) {
       // Add the application to the $EnabledApplications array in conf/applications.php
-      $ApplicationInfo = ArrayValue($ApplicationName, $this->AvailableApplications(), array());
+      $ApplicationInfo = ArrayValueI($ApplicationName, $this->AvailableApplications(), array());
+      $ApplicationName = $ApplicationInfo['Index'];
       $ApplicationFolder = ArrayValue('Folder', $ApplicationInfo, '');
       if ($ApplicationFolder == '')
          throw new Exception(T('The application folder was not properly defined.'));
@@ -205,7 +215,8 @@ class Gdn_ApplicationManager {
     */
    public function DisableApplication($ApplicationName) {
       // 1. Check to make sure that this application is allowed to be disabled
-      $ApplicationInfo = ArrayValue($ApplicationName, $this->AvailableApplications(), array());
+      $ApplicationInfo = ArrayValueI($ApplicationName, $this->AvailableApplications(), array());
+      $ApplicationName = $ApplicationInfo['Index'];
       if (!ArrayValue('AllowDisable', $ApplicationInfo, TRUE))
          throw new Exception(sprintf(T('You cannot disable the %s application.'), $ApplicationName));
 
@@ -219,6 +230,10 @@ class Gdn_ApplicationManager {
 
       // 2. Disable it
       RemoveFromConfig('EnabledApplications'.'.'.$ApplicationName);
+
+      // Clear the object caches.
+      @unlink(PATH_CACHE.'/controller_map.ini');
+      @unlink(PATH_CACHE.'/library_map.ini');
 
       // Redefine the locale manager's settings $Locale->Set($CurrentLocale, $EnabledApps, $EnabledPlugins, TRUE);
       $Locale = Gdn::Locale();

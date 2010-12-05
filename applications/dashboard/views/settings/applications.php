@@ -1,7 +1,7 @@
 <?php if (!defined('APPLICATION')) exit();
 $Session = Gdn::Session();
-$UpdateUrl = Gdn::Config('Garden.UpdateCheckUrl');
-$AddonUrl = Gdn::Config('Garden.AddonUrl');
+$UpdateUrl = C('Garden.UpdateCheckUrl');
+$AddonUrl = C('Garden.AddonUrl');
 $AppCount = count($this->AvailableApplications);
 $EnabledCount = count($this->EnabledApplications);
 $DisabledCount = $AppCount - $EnabledCount;
@@ -22,7 +22,7 @@ $DisabledCount = $AppCount - $EnabledCount;
       <li<?php echo $this->Filter == 'disabled' ? ' class="Active"' : ''; ?>><?php echo Anchor(T('Disabled '.Wrap($DisabledCount)), 'settings/applications/disabled'); ?></li>
       <?php
       if ($AddonUrl != '')
-         echo Wrap(Anchor('Get More Applications', $AddonUrl), 'li');
+         echo Wrap(Anchor(T('Get More Applications'), $AddonUrl), 'li');
       ?>
    </ul>
 </div>
@@ -72,7 +72,7 @@ foreach ($this->AvailableApplications as $AppName => $AppInfo) {
             );
             
             if ($SettingsUrl != '') {
-               echo Anchor('Settings', $SettingsUrl, 'SmallButton');
+               echo Anchor(T('Settings'), $SettingsUrl, 'SmallButton');
             }
          ?></td>
          <td class="Alt Info"><?php
@@ -106,7 +106,7 @@ foreach ($this->AvailableApplications as $AppName => $AppInfo) {
             
             if ($AppUrl != '') {
                $Info .= '<span>|</span>';
-               $Info .= Anchor('Visit Site', $AppUrl);
+               $Info .= Anchor(T('Visit Site'), $AppUrl);
             }
             
             echo $Info != '' ? $Info : '&nbsp;';
@@ -118,7 +118,7 @@ foreach ($this->AvailableApplications as $AppName => $AppInfo) {
          ?>
          <tr class="<?php echo $RowClass; ?>">
             <td colspan="2"><div class="Alert"><a href="<?php
-               echo CombinePaths(array($AddonUrl, 'find', urlencode($AppName)), '/');
+               echo CombinePaths(array($UpdateUrl, 'find', urlencode($AppName)), '/');
             ?>"><?php
                printf(T('%1$s version %2$s is available.'), $ScreenName, $NewVersion);
             ?></a></div></td>

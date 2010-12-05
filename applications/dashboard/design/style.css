@@ -410,7 +410,6 @@ div.MorePager a.Loading {
 #Head {
    background: #38abe3;
    padding: 0;
-   text-align: right;
 }
 div.Search:after,
 div#Search:after {
@@ -421,13 +420,11 @@ div#Search:after {
    visibility: hidden;
 }
 body #Head h1 {
-   display: block;
+   display: inline-block;
    font-weight: bold;
    margin: 0;
-   padding: 21px 7px 0 0;
+   padding: 21px 10px 4px 0;
    border: 0;
-   float: left;
-   line-height: 1;
 }
 #Head h1 a span {
    font-size: 24px;
@@ -482,14 +479,6 @@ body #Head h1 {
   	box-shadow: none;
 	-moz-box-shadow: none;
 	-webkit-box-shadow: none;     	
-}
-#Menu {
-   height: 28px;
-   padding: 0;
-}
-#Menu {
-   margin: 0;
-   padding: 0;
 }
 #Menu ul {
 	display: none;
@@ -670,14 +659,16 @@ ul.Options li.Active ul {
 
 /* ================================================================ Main Menu */
 div.Menu {
-   text-align: right;
    width: 960px;
    margin: 0 auto;
+   position: relative;
+   text-align: left;
+   vertical-align: bottom;
 }
 ul#Menu {
-   float: left;
-   margin: 0 auto;
-   padding: 22px 0 0 10px;
+   display: inline-block;
+   margin-right: 280px;
+   vertical-align: bottom;
 }
 #Menu ul,
 #Menu li.Active {
@@ -702,6 +693,12 @@ ul#Menu {
    color: #299fc7;
 }
 
+#Head .Search, #Head #Search {
+   position: absolute;
+   right: 0;
+   bottom: 6px;
+   text-align: right;
+}
 
 /* ======================================================== Panels / Sidebars */
 #Panel {
@@ -754,6 +751,14 @@ ul.PanelActivity li {
    border-bottom: 1px solid #abdafb;
    padding: 2px 4px;
 	color: #555;
+	font-size: 11px;
+	line-height: 1.6;
+}
+ul.PanelActivity li a {
+	font-size: 13px;
+}
+ul.PanelActivity li a.Name {
+	margin-right: 2px;
 }
 ul.PanelActivity span {
 	padding: 0 4px;
@@ -881,129 +886,6 @@ a.BigButton:focus {
 	box-shadow: 0px 0px 2px #999;
 	-moz-box-shadow: 0px 0px 2px #999;
 	-webkit-box-shadow: 0px 0px 2px #999;  
-}
-
-
-/* ============================================================= Entry Screen */
-body.Entry {
-   text-align: center;
-}
-body.Entry div.Panel {
-   display: none;
-}
-body.Entry #Content {
-   float: none;
-   margin: 0 auto;
-   width: 360px;
-   text-align: center;
-}
-body#dashboard_entry_handshake #Content {
-	width: 720px;
-}
-body#dashboard_entry_handshake ul.NewAccount {
-	float: left;
-	width: 330px;
-	margin-right: 29px;
-	border-right: 1px solid #A5D0E7;
-}
-body#dashboard_entry_handshake div.Info {
-	border: 1px solid #A5D0E7;
-	background: #D3F0FF;
-	color: #02475A;
-}
-body.Entry #Content div.Box {
-   background: #c4e1ff;
-   border-radius: 2px;
-   -moz-border-radius: 2px;
-   -webkit-border-radius: 2px;
-	border: 0;
-	margin: 0;
-	padding: 0;
-}
-body.Entry p {
-	text-align: left;
-	padding: 0 10px;
-	margin: 10px 0 10px;
-}
-body#dashboard_entry_leave p {
-	margin: 0;
-   padding: 20px 10px;
-}
-body#dashboard_entry_leave p.Leaving {
-   background: url('images/progress.gif') left center no-repeat;
-	margin: 0 0 0 14px;
-   padding: 20px 0 20px 50px;
-}
-
-body.Entry #Content h1 {
-   border: none;
-   color: #02475A;
-   font-size:140%;
-   font-weight:bold;
-   padding: 6px;
-	margin: 0;
-	text-align: left;
-}
-body#dashboard_entry_handshake #Content h2 {
-   border: none;
-   color: #02475A;
-   font-size:140%;
-   font-weight:bold;
-   padding: 6px 0;
-	margin: 0;
-	text-align: left;
-}
-body.Entry #Content form {
-	text-align: left;
-	padding: 10px 30px 20px;
-}
-body#dashboard_entry_handshake #Content form {
-	padding: 20px 30px 26px;
-}
-body.Entry form ul li label {
-	font-size: 14px;
-	color: #474747;
-	font-weight: bold;
-	padding: 6px 0 0;
-	display: block;
-}
-body.Entry form ul li label.CheckBoxLabel,
-body.Entry form ul li label.RadioLabel {
-	font-size: 12px;
-	font-weight: normal;
-   width: auto;
-}
-body.Entry input.DateBox,
-body.Entry input.InputBox,
-body.Entry textarea {
-   width: 290px;
-}
-body.Entry div.Popup input.DateBox,
-body.Entry div.Popup input.InputBox,
-body.Entry div.Popup textarea {
-   width: 250px;
-}
-span.Incorrect {
-   display: block;
-   color: red;
-}
-body.Entry input.Button {
-	margin: 10px 0 0;
-}
-#Form_User_SignIn li.Buttons span {
-	padding: 0 6px;
-}
-#Form_User_SignIn li.Buttons input.Button,
-body.Entry li.Buttons input.Button {
-	margin: 10px 0;
-}
-#Form_User_Password,
-body.Entry #Content #Form_User_Password {
-	padding-top: 0;
-}
-#dashboard_entry_index #Form_User_Password ul li label,
-#dashboard_entry_signin #Form_User_Password ul li label {
-	padding: 0;
 }
 
 /* ================================================ DataList (Search Results) */
@@ -1266,6 +1148,7 @@ ul.MessageList li.Item {
 ul.MessageList div.Meta {
    font-size: 11px;
    color: #777;
+	min-height: 40px;
 }
 ul.MessageList div.Meta span.Author img {
    height: 40px;
@@ -1286,9 +1169,6 @@ ul.MessageList div.Meta span.Author {
 ul.MessageList div.Meta span.Author a {
    font-size: 15px;
    font-weight: bold;
-}
-ul.MessageList div.Comment div.Meta {
-   min-height: 50px;
 }
 
 ul.MessageList div.Comment div.Meta span {
@@ -1311,7 +1191,11 @@ div.Preview {
 	margin: 4px 0 8px;
 }
 div.Popup div.Preview {
+	padding: 8px;
 	margin: 0;
+}
+body.Post div.Popup a.Close {
+	color: #1e79a7;
 }
 div.Preview div.Message,
 ul.MessageList div.Message {
@@ -1319,24 +1203,21 @@ ul.MessageList div.Message {
    line-height: 140%;
    font-size: 100%;
 }
+div.Preview div.Message,
 div.Preview div.Message p,
+ul.MessageList div.Message,
 ul.MessageList div.Message p {
    margin: 8px 0;
 }
 div.Preview div.Message blockquote,
 ul.MessageList div.Message blockquote {
-   border-radius: 3px;
-   -moz-border-radius: 3px;
-   -webkit-border-radius: 3px;
    padding: 4px 16px;
    margin: 4px 0;
-   background: #ffc;
 }
 div.Preview div.Message code,
 div.Preview div.Message pre,
 ul.MessageList div.Message code,
 ul.MessageList div.Message pre {
-   display: block;
    border-radius: 2px;
    -moz-border-radius: 2px;
    -webkit-border-radius: 2px;
@@ -1346,6 +1227,10 @@ ul.MessageList div.Message pre {
    font-family: monospace;
    overflow: auto;
 	border: 1px solid #eec;
+}
+div.Preview div.Message pre,
+ul.MessageList div.Message pre {
+   display: block;
 }
 div.Preview div.Message strong,
 ul.MessageList div.Message strong {
@@ -1384,8 +1269,12 @@ div.Message h2 { font-size: 20px; }
 div.Message h3 { font-size: 18px; }
 div.Message h4 { font-size: 16px; }
 div.Message h5 { font-size: 14px; }
-
-
+div.Message div.ImageResized {
+	font-size: 11px;
+	font-weight: normal;
+	cursor: pointer;
+	margin-bottom: 10px;
+}
 /* The "Foot" is at the bottom of the #Content section. Used for more results
 links, sign in buttons, etc */
 .Foot {
@@ -1595,16 +1484,6 @@ div.Tabs li {
    display: inline;
    margin: 0;
 }
-div.MessageForm a.Back,
-div.MessageForm a.Back:link,
-div.MessageForm a.Back:hover,
-div.MessageForm a.Back:active,
-div.MessageForm a.Back:visited,
-div.MessageForm a.Cancel,
-div.MessageForm a.Cancel:link,
-div.MessageForm a.Cancel:hover,
-div.MessageForm a.Cancel:active,
-div.MessageForm a.Cancel:visited,
 div.MorePager a,
 div.MorePager a:link,
 div.MorePager a:hover,
@@ -1633,20 +1512,6 @@ div.Tabs li a:visited {
    padding: 5px 10px;
 	line-height: 2.6;
 }
-div.MessageForm a.Back,
-div.MessageForm a.Back:link,
-div.MessageForm a.Back:hover,
-div.MessageForm a.Back:active,
-div.MessageForm a.Back:visited,
-div.MessageForm a.Cancel,
-div.MessageForm a.Cancel:link,
-div.MessageForm a.Cancel:hover,
-div.MessageForm a.Cancel:active,
-div.MessageForm a.Cancel:visited {
-	line-height: 1.2;
-}
-div.MessageForm a.Back:hover,
-div.MessageForm a.Cancel:hover,
 div.MorePager li a:hover,
 a.TabLink:hover,
 div.Tabs li a:hover {
@@ -1772,6 +1637,9 @@ div.Popup div.Messages ul {
    border-radius: 2px;
 	-moz-border-radius: 2px;
 	-webkit-border-radius: 2px;
+	box-shadow: none;
+	-moz-box-shadow: none;
+	-webkit-box-shadow: none;
 }
 * html div.Popup div.Messages {
   position: inherit;
@@ -1785,6 +1653,7 @@ div.Popup .Info {
 }
 div.Popup .Loading {
    display: block;
+	width: 200px;
 }
 div.Overlay {
   position: absolute;
@@ -1806,6 +1675,7 @@ div.Popup div.Border {
   text-align: left;
   position: relative;
   max-width: 500px;
+  display: inline-block;
 }
 div.Popup div.Body {
   background: #fff;
@@ -1820,7 +1690,9 @@ div.Popup .Loading {
   text-align: center;
 }
 div.Popup h1,
-div.Popup h2 {
+div.Popup h2,
+div.Connect h1,
+div.Connect h2 {
 	font-size:120%;
 	font-weight:bold;
 	margin-bottom: 0;
@@ -1900,32 +1772,17 @@ div.Profile #Form_User input.Button,
 div.Popup input.Button {
 	margin: 4px 0 2px;
 }
-body.Entry div.Popup p {
-	color: #000;
-}
 div.Popup #Form_User div.Warning,
 #dashboard_profile_picture #Form_User div.Warning {
 	margin: 6px 0;
 }
-div.SignInPopup div.Border {
-	max-width: 320px;
-}
-div.SignInPopup .Content form {
-	padding: 0 30px 10px;
-}
-div.SignInPopup div.Box {
-	margin: 0;
-	padding: 0;
-	background: none;
-	border: 0;
-}
+
 /* Serious Ajax Error Styles */
 div.AjaxError {
 	white-space: pre;
 	overflow: auto;
 	padding: 10px;
 }
-
 
 /* ==================================================================== Legal */
 div.Legal h3 {
@@ -2092,20 +1949,19 @@ li.Editing {
 	background: #E3F4FF;
 }
 div.CommentForm textarea {
-   width: 656px;
+   width: 99%;
    height: 100px;
    min-height: 100px;
    margin: 0 0 6px;
 }
 div.Comment div.CommentForm {
-	width: 652px;
+	width: 98%;
 	background: none;
 	padding: 6px 4px;
 	border: 0;
-	clear: left;
 }
 div.Comment div.CommentForm textarea {
-	width: 643px;	
+	width: 99%;	
 }
 #DiscussionForm label {
    font-size: 14px;
@@ -2116,7 +1972,7 @@ body.Post #Panel {
    display: none;
 }
 body.Post #Content {
-   width: auto;
+   width: 100%;
 }
 #DiscussionForm h2 {
    border: none;
@@ -2136,13 +1992,13 @@ body.Post #Content {
    padding: 20px;
 }
 #DiscussionForm textarea {
-   width: 910px;
+   width: 99%;
    height: 100px;
    min-height: 100px;
    margin: 0 0 6px;
 }
 #DiscussionForm input.InputBox {
-   width: 910px;
+   width: 99%;
    margin-bottom: 10px;
 }
 #DiscussionForm div.Category {
@@ -2458,24 +2314,291 @@ ul.Tabs li a.EntryTabFor_password {
 	background-position: 3px 4px;
 	background-repeat: no-repeat;
 }
-body.Entry #Content div.Entry {
-	background: #fff;
+
+
+/* ============================================================ Entry Screens */
+body.Entry {
+   text-align: center;
 }
-body.Entry #Content div.Entry div.Box {
+body.Entry #Panel {
+   display: none;
+}
+body.Entry #Content {
+   float: none;
+   margin: 0 auto;
+   width: 360px;
+   text-align: center;
+}
+body.Entry #Content h1 {
+   border: none;
+   color: #02475A;
+   font-size:140%;
+   font-weight:bold;
+   padding: 6px;
+	margin: 0;
+	text-align: left;
+}
+body.Entry #Content form {
+	text-align: left;
+	padding: 10px;
+}
+body.Entry form ul li label {
+	font-size: 14px;
+	color: #474747;
+	font-weight: bold;
+	padding: 6px 0 0;
+	display: block;
+}
+body.Entry form ul li label.CheckBoxLabel,
+body.Entry form ul li label.RadioLabel {
+	font-size: 12px;
+	font-weight: normal;
+   width: auto;
+}
+body.Entry input.DateBox,
+body.Entry input.InputBox,
+body.Entry textarea {
+   width: 310px;
+}
+span.Incorrect {
+   display: block;
+   color: red;
+}
+
+/* Sign In Page & Popup */
+div.SignInPopup div.Box {
+	margin: 0;
+	padding: 0;
+	background: none;
+	border: 0;
 	border-radius: 0;
 	-moz-border-radius: 0;
 	-webkit-border-radius: 0;
 	box-shadow: none;
 	-moz-box-shadow: none;
 	-webkit-box-shadow: none;
-	background:none;
-	border: none;
-	margin: 0;
+}
+body#dashboard_entry_password #Content,
+body#dashboard_entry_signin #Content {
+	width: auto;
+}
+div.SignInPopup .Content form {
+	padding: 0 10px 10px;
+}
+body#dashboard_entry_password #Content form,
+body#dashboard_entry_signin #Content form {
+	padding: 0;
+	text-align:left;
+}
+body#dashboard_entry_password #Content form,
+body#dashboard_entry_signin #Content form,
+div.SignInPopup form {
+	width: 270px;
+}
+div.SingleEntryMethod {
+	width: 290px;
+	margin: 0 auto;
+}
+div.MultipleEntryMethods {
+	width: 500px;
+	margin: 0 auto;
+}
+body#dashboard_entry_handshake #Content input.InputBox,
+body#dashboard_entry_signin #Content input.InputBox,
+body#dashboard_entry_password #Content input.InputBox,
+div.SignInPopup input.DateBox,
+div.SignInPopup input.InputBox,
+div.SignInPopup textarea {
+   width: 260px;
+	padding: 3px;
+}
+div.SignInPopup form ul li label,
+body#dashboard_entry_signin form ul li label,
+body#dashboard_entry_password form ul li label,
+body#dashboard_entry_handshake form ul li label {
+	font-size: 13px;
+	line-height: 1.5;
 	padding: 0;
 }
-body.Entry #Content div.Entry div.Method h1 {
-	display: none;
+body#dashboard_entry_password #Content form ul li input#Form_Email,
+body#dashboard_entry_signin #Content form ul li input#Form_Email {
+	margin-bottom: 6px;
 }
-body.Entry #Content div.Entry form {
-	padding:10px 20px 20px;
+body#dashboard_entry_password #Content input.Password,
+body#dashboard_entry_signin #Content input.Password,
+div.SignInPopup input.Password {
+	width: 180px;
+}
+a.ForgotPassword {
+	margin-left: 10px;
+}
+li.Buttons div a.ForgotPassword {
+	margin: 0;
+}
+body#dashboard_entry_password ul li label.CheckBoxLabel,
+body#dashboard_entry_signin ul li label.CheckBoxLabel,
+div.SignInPopup ul li label.CheckBoxLabel {
+	color: #777;
+	display: inline;
+	font-size: 12px;
+	font-weight: normal;
+	margin: 10px 0 0 10px;
+}
+body.Entry li.Buttons input.Button,
+div.SignInPopup li.Buttons input.Button {
+	margin: 10px 0;
+}
+div.Entry {
+	position: relative;
+}
+div.Methods {
+	text-align: left;
+	font-size: 14px;
+	font-weight: bold;
+	position: absolute;
+	top: 33px;
+	bottom: 0;
+	right: 0;
+	padding: 12px 20px 6px;
+	line-height: 1;
+}
+body#dashboard_entry_password div.Methods,
+body#dashboard_entry_signin div.Methods {
+	padding: 10px 6px 6px;
+	background: none;
+}
+div.Methods div.Method {
+	padding: 10px 0 0;
+	text-align: left;
+}
+
+/* Handshake */
+body#dashboard_entry_handshake #Content {
+	width: 720px;
+}
+body#dashboard_entry_handshake #Content form {
+	padding: 20px 30px 26px;
+}
+body#dashboard_entry_handshake ul.NewAccount {
+	float: left;
+	width: 315px;
+	margin-right: 44px;
+	border-right: 1px solid #A5D0E7;
+}
+body#dashboard_entry_handshake ul.LinkAccount {
+	margin-left: 315px;
+}
+ul.NewAccount h2,
+ul.LinkAccount h2 {
+	padding-left: 36px !important;
+	background: url('images/dashboard-sprites.png') 0 -542px no-repeat;
+}
+ul.LinkAccount h2 {
+	padding-left: 84px !important;
+	background-position: 45px -296px;
+}
+body#dashboard_entry_handshake div.Info {
+	border: 1px solid #A5D0E7;
+	background: #D3F0FF;
+	color: #02475A;
+}
+body#dashboard_entry_handshake #Content h2 {
+   border: none;
+   color: #02475A;
+   font-size:140%;
+   font-weight:bold;
+   padding: 6px 0;
+	margin: 0;
+	text-align: left;
+}
+
+
+/* Leaving Page */
+body#dashboard_entry_leave p {
+	margin: 0;
+   padding: 20px 10px;
+}
+body#dashboard_entry_leave p.Leaving {
+   background: url('images/progress.gif') left center no-repeat;
+	margin: 0 0 0 14px;
+   padding: 20px 0 20px 50px;
+}
+
+
+
+/* External App Connect Designs */
+div.Connect h1,
+div.Connect h2 {
+	text-align: left;
+}
+body.connect div.Box {
+	border-radius: none;
+	-moz-border-radius: none;
+	-webkit-border-radius: none;
+	box-shadow: none;
+	-moz-box-shadow: none;
+	-webkit-box-shadow: none;
+	width: 320px;
+	margin: 0 auto;
+	text-align: left;
+	background: none;
+}
+div.ConnectInfo {
+	margin: 10px 0 0;
+	position: relative;
+}
+div.ConnectInfo img {
+	position: absolute;
+	height: 36px;
+	width: 36px;
+	top: 0;
+	left: 0;
+}
+div.ConnectInfo span.Name {
+	padding-left: 46px;
+	font-weight: bold;
+	line-height: 1;
+	font-size: 13px;
+	color: #444;
+	display: block;
+}
+div.ConnectInfo h3 {
+	font-family: 'lucida grande','Lucida Sans Unicode', tahoma, sans-serif;
+	font-size: 15px;
+	font-weight: bold;
+	line-height: 1.6;
+	color: #333;
+	padding: 0 0 10px 46px;
+	border: none;
+}
+div.Connect form ul li label,
+div.SignInPopup form ul li label,
+body#dashboard_entry_password form ul li label,
+body#dashboard_entry_signin form ul li label {
+	font-size: 13px;
+	line-height: 1.5;
+	padding: 0;
+}
+div.Connect form ul li#ConnectPassword label,
+div.SignInPopup form ul li#ConnectPassword label {
+	padding: 10px 0 0;
+}
+div.Connect .FinePrint,
+div.SignInPopup .FinePrint {
+	font-size: 11px;
+	color: #777;
+}
+body#dashboard_entry_password input.InputBox,
+body#dashboard_entry_signin input.InputBox,
+div.Connect input.InputBox,
+div.SignInPopup input.InputBox {
+	padding: 3px
+}
+div.Connect .ExistingUsername,
+div.SignInPopup .ExistingUsername {
+	font-weight: bold;
+	line-height: 1;
+	font-size: 13px;
+	color: #000;
+	display: block;
 }

@@ -375,6 +375,10 @@ div.Errors ul {
    -moz-border-radius: 0;
    -webkit-border-radius: 0;
 }
+div.Errors a {
+   color: #fff;
+   text-decoration: underline;
+}
 div.Errors ul li {
    color: #fff !important;
 	font-size: 12px;
@@ -454,8 +458,8 @@ div.Box {
    background: #d3f0ff;
 }
 .Warning {
-   border: 1px solid #aaa;
-   background: #ffc;
+   background: #ff9;
+   padding: 10px 20px;
 }
 strong {
 	font-weight: bold;
@@ -1022,11 +1026,12 @@ div.Box h4.Active a {
 }
 #Panel div.Box h4 { background: url('images/dashboard-sprites.png') 166px -145px no-repeat; }
 #Panel div.Dashboard h4 { background-position: 166px 7px; }
-#Panel div.Appearance h4 { background-position: 166px -492px; }
+#Panel div.Appearance h4 { background-position: 164px -1195px; }
 #Panel div.Users h4 { background-position: 162px -292px; }
 #Panel div.Forum h4 { background-position: 167px -442px; }
 #Panel div.Addons h4 { background-position: 166px -240px; }
 #Panel div.SiteSettings h4 { background-position: 164px -92px; }
+#Panel div.Import h4 { background-position: 164px -1139px; }
 div.Box dl {
    border-bottom: 1px solid #aedefc;
    background: #f0fbff;
@@ -1636,4 +1641,78 @@ div.Summary table tbody td {
 	height: 32px;
 	width: 72px;
 	margin: 6px 0 10px;
+}
+
+.Tag {
+   background: #555;
+   color: #fff;
+   border-radius: 2px;
+   -moz-border-radius: 2px;
+   -webkit-border-radius: 2px;
+
+   font-size: 11px;
+   padding: 1px 6px !Important;
+}
+
+.NumberedPager {
+   font-size:16px;
+   font-weight:bold;
+   margin:1px 0 0;
+   text-align:right;
+}
+
+.NumberedPager a,
+.NumberedPager span {
+	padding: 0 4px;
+}
+.NumberedPager span,
+.NumberedPager a.Highlight {
+	color: #777;
+}
+.NumberedPager a.Next,
+.NumberedPager span.Next,
+.NumberedPager a.Previous,
+.NumberedPager span.Previous {
+	font-size: 16px;
+	line-height: 10px;
+}
+.NumberedPager a.Next,
+.NumberedPager span.Next {
+	margin-left: 6px;
+}
+.NumberedPager a.Previous,
+.NumberedPager span.Previous {
+	margin-right: 6px;
+}
+
+/* Help Links */
+.Help {
+   padding: 8px;
+	line-height: 1;
+}
+.Help h2 {
+   font-size: 14px;
+	font-weight: bold;
+	text-shadow: none;
+   margin: 0 0 10px;
+}
+.Help ul {
+   list-style: disc;
+   margin-left: 19px;
+}
+.Help li {
+   margin-top: 6px;
+	line-height: 1.5;
+}
+.Aside {
+   border: solid 1px #ccc;
+   background: #ff8;
+   border-radius: 3px;
+   -moz-border-radius: 3px;
+   -webkit-border-radius: 3px;
+   width: 220px;
+   float: right;
+   z-index: 200;
+   position: relative;
+   margin: 6px;
 }

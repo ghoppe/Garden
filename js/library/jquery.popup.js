@@ -29,6 +29,8 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
     this.live('click', function() {
       settings.sender = this;
+      $.extend(settings, { popupType: $(this).attr('popupType') });
+
       $.popup.init(settings);
       if (!settings.confirm)
         $.popup.loading(settings);
@@ -45,7 +47,7 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
             $.ajax({
                 type: "GET",
                 url: target,
-                data: { 'DeliveryType' : settings.deliveryType, 'DeliveryMethod' : 'JSON' },
+                data: {'DeliveryType' : settings.deliveryType, 'DeliveryMethod' : 'JSON'},
                 dataType: 'json',
                 error: function(XMLHttpRequest, textStatus, errorThrown) {
                    $.popup({}, XMLHttpRequest.responseText);
@@ -65,9 +67,21 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
         });
       } else {
         if (target) {
-          $.get(target, {'DeliveryType': settings.deliveryType}, function(data) {
-            $.popup.reveal(settings, data)
-          });
+           $.ajax({
+              type: 'GET',
+              url: target,
+              data: {
+                 'DeliveryType': settings.deliveryType },
+                 error: function(request, textStatus, errorThrown) {
+                    $.popup.reveal(settings, request.responseText);
+                 },
+                 success: function(data) {
+                    $.popup.reveal(settings, data);
+                 }
+           });
+//          $.get(target, {'DeliveryType': settings.deliveryType}, function(data) {
+//            $.popup.reveal(settings, data)
+//          });
         }
       }
         
@@ -139,12 +153,12 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
       $('#'+settings.popupId).addClass(settings.containerCssClass);
       
     var pagesize = $.popup.getPageSize();
-    $('div.Overlay').css({ height: pagesize[1] });
+    $('div.Overlay').css({height: pagesize[1]});
     
-    var pageScroll = $.popup.getPageScroll();
+    var pagePos = $.popup.getPagePosition();
     $('#'+settings.popupId).css({
-      top:   pageScroll[1] + ($.popup.getPageHeight() / 10),
-      left:   pageScroll[0]
+      top: pagePos.top,
+      left: pagePos.left
     });
     $('#'+settings.popupId).show();
 
@@ -201,6 +215,15 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
 
       formSaved = json['FormSaved'];
       data = json['Data'];
+
+      // Add any js that's come in.
+      $(json.js).each(function(i, el){
+         var v_js  = document.createElement('script');
+         v_js.type = 'text/javascript';
+         v_js.src = gdn.url(el);
+         document.getElementsByTagName('head')[0].appendChild(v_js);
+      });
+
       // mosullivan - need to always reload the data b/c when uninviting ppl
       // we need to reload the invitation table. Is there a reason not to reload
       // the content?
@@ -241,10 +264,33 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
             }
          }
       });
+
+      // Hijack links to navigate within the same popup.
+      $('#'+settings.popupId+' .PopLink').click(function() {
+         $.popup.loading(settings);
+         
+         // Ajax the link into the current popup.
+          $.get($(this).attr('href'), {'DeliveryType': settings.deliveryType}, function(data, textStatus, xhr) {
+             if (typeof(data) == 'object') {
+                if (data.RedirectUrl)
+                    setTimeout("document.location='" + gdn.url(data.RedirectUrl) + "';", 300);
+
+                $.postParseJson(data);
+             }
+             $.popup.reveal(settings, data);
+//            $('#'+settings.popupId+' .Content').html(data);
+          });
+
+         return false;
+      });
+
     }
     
     // If there is a cancel button in the popup, hide it (the popup has it's own close button)
     $('#'+settings.popupId+' a.Cancel').hide();
+    
+    // Trigger an even that plugins can attach to when popups are revealed.
+    $('body').trigger('popupReveal');
     
     return false;
   }
@@ -306,77 +352,48 @@ Copyright 2007 Chris Wanstrath [ chris@ozmm.org ]
     afterLoad: function() {}
   }
 
-  // Adapted from getPageSize() by quirksmode.com
-  $.popup.getPageHeight = function() {
-    var windowHeight
-    if (self.innerHeight) {   // all except Explorer
-      windowHeight = self.innerHeight;
-    } else if (document.documentElement && document.documentElement.clientHeight) { // Explorer 6 Strict Mode
-      windowHeight = document.documentElement.clientHeight;
-    } else if (document.body) { // other Explorers
-      windowHeight = document.body.clientHeight;
-    }   
-    return windowHeight
+  $.popup.inFrame = function() {
+    try {
+      if (top !== self && $(parent.document).width())
+        return true;
+    } catch(e) { }
+    
+    return false;
   }
   
   $.popup.getPageSize = function() {
-    var xScroll, yScroll;
-    if (window.innerHeight && window.scrollMaxY) {   
-       xScroll = window.innerWidth + window.scrollMaxX;
-       yScroll = window.innerHeight + window.scrollMaxY;
-    } else if (document.body.scrollHeight > document.body.offsetHeight){ // all but Explorer Mac
-       xScroll = document.body.scrollWidth;
-       yScroll = document.body.scrollHeight;
-    } else { // Explorer Mac...would also work in Explorer 6 Strict, Mozilla and Safari
-       xScroll = document.body.offsetWidth;
-       yScroll = document.body.offsetHeight;
-    }
-    var windowWidth, windowHeight;
-    if (self.innerHeight) {   // all except Explorer
-       if(document.documentElement.clientWidth){
-          windowWidth = document.documentElement.clientWidth; 
-       } else {
-          windowWidth = self.innerWidth;
-       }
-       windowHeight = self.innerHeight;
-    } else if (document.documentElement && document.documentElement.clientHeight) { // Explorer 6 Strict Mode
-       windowWidth = document.documentElement.clientWidth;
-       windowHeight = document.documentElement.clientHeight;
-    } else if (document.body) { // other Explorers
-       windowWidth = document.body.clientWidth;
-       windowHeight = document.body.clientHeight;
-    }   
-    // for small pages with total height less then height of the viewport
-    if(yScroll < windowHeight){
-       pageHeight = windowHeight;
-    } else { 
-       pageHeight = yScroll;
-    }
-    // for small pages with total width less then width of the viewport
-    if(xScroll < windowWidth){   
-       pageWidth = xScroll;      
-    } else {
-       pageWidth = windowWidth;
-    }
-    arrayPageSize = new Array(pageWidth,pageHeight,windowWidth,windowHeight);
+    var inFrame = $.popup.inFrame();
+    var doc = $(inFrame ? parent.document : document);
+    var win = $(inFrame ? parent.window : window);
+    arrayPageSize = new Array(
+      $(doc).width(),
+      $(doc).height(),
+      $(win).width(),
+      $(win).height()
+    );
     return arrayPageSize;
   };  
   
-  
-  // getPageScroll() by quirksmode.com
-  $.popup.getPageScroll = function() {
-    var xScroll, yScroll;
-    if (self.pageYOffset) {
-      yScroll = self.pageYOffset;
-      xScroll = self.pageXOffset;
-    } else if (document.documentElement && document.documentElement.scrollTop) {    // Explorer 6 Strict
-      yScroll = document.documentElement.scrollTop;
-      xScroll = document.documentElement.scrollLeft;
-    } else if (document.body) {// all other Explorers
-      yScroll = document.body.scrollTop;
-      xScroll = document.body.scrollLeft;   
+  $.popup.getPagePosition = function() {
+    var inFrame = $.popup.inFrame();
+    var doc = $(inFrame ? parent.document : document);
+    var win = $(inFrame ? parent.window : window);
+    var scroll = { 'top':doc.scrollTop(), 'left':doc.scrollLeft() };
+    var t = scroll.top + ($(win).height() / 10);
+    if (inFrame) {
+      var el = $(parent.document).find('iframe[id^=vanilla]');
+      el = el ? el : $(document); // Just in case iframe is not id'd properly
+      t -= (el.offset().top);
+      // Don't slide above or below the frame bounds.
+      var diff = $(doc).height() - $(document).height();
+      var maxOffset = $(document).height() - diff;
+      if (t < 0) {
+        t = 0;
+      } else if (t > maxOffset) {
+        t = maxOffset;
+      }
     }
-    return new Array(xScroll,yScroll) 
-  }
+    return {'top':t, 'left':scroll.left};
+  };
 
 })(jQuery);

@@ -22,7 +22,6 @@ function WriteComment($Object, $Sender, $Session, $CurrentOffset) {
    }
    $Sender->Options = '';
    $CssClass .= $Object->InsertUserID == $Session->UserID ? ' Mine' : '';
-   
    $Sender->FireEvent('BeforeCommentDisplay');
 ?>
 <li class="<?php echo $CssClass; ?>" id="<?php echo $Id; ?>">
@@ -51,7 +50,12 @@ function WriteComment($Object, $Sender, $Session, $CurrentOffset) {
       </div>
       <div class="Message">
 			<?php $Sender->FireEvent('BeforeCommentBody'); ?>
-			<p><?php echo Gdn_Format::To($Object->Body, $Object->Format); ?></p>
+			<?php 
+			   $Object->FormatBody = Gdn_Format::To($Object->Body, $Object->Format);
+			   $Sender->FireEvent('AfterCommentFormat');
+			   $Object = $Sender->EventArguments['Object'];
+			   echo $Object->FormatBody;
+			?>
 		</div>
       <?php $Sender->FireEvent('AfterCommentBody'); ?>
    </div>

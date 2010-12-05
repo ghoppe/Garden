@@ -37,9 +37,10 @@ function Gdn_Slice(SliceElement, SliceID) {
    Gdn_Slice.prototype.Go = function() {
       this.RawSlice.Slice = this;
       
-      if (this.Slice.hasClass('Async'))
+      if (this.Slice.hasClass('Async')) {
+         this.Slice.removeClass('Async');
          this.GetSlice();
-      else
+      } else
          this.ParseSlice();
    }
    
@@ -53,13 +54,6 @@ function Gdn_Slice(SliceElement, SliceID) {
          this.Slice.css('height', '30px');
          SliceDimensions.height = 30;
       }
-         
-/*
-      if (!SliceDimensions.width) {
-         this.Slice.css('width', '300px');
-         SliceDimensions.width = 300;
-      }
-*/
 
       var Overlay = document.createElement('div');
       Overlay.className = 'SliceOverlay';
@@ -81,9 +75,6 @@ function Gdn_Slice(SliceElement, SliceID) {
       $(Overlay).html('<img src="'+ImgPath+'"/>');
       this.Slice.append(Overlay);
       $(Overlay).fadeTo('fast',0.7);
-      this.Slice.animate({
-         'padding': '10px'
-      });
    }
    
    Gdn_Slice.prototype.GetSlice = function(PassiveGet) {
@@ -92,7 +83,7 @@ function Gdn_Slice(SliceElement, SliceID) {
          
       this.PrepareSliceForRequest();
       
-      var SliceURL = gdn.combinePaths(gdn.definition('WebRoot'),this.SliceURL);
+      var SliceURL = gdn.url(this.SliceURL);
       jQuery.ajax({
          url: SliceURL,
          type: 'GET',
@@ -104,8 +95,20 @@ function Gdn_Slice(SliceElement, SliceID) {
    Gdn_Slice.prototype.PostSlice = function(Event) {
       this.PrepareSliceForRequest();
       
-      var SliceForm = $(Event.target).parents('form');
-      var SliceURL = gdn.combinePaths(gdn.definition('WebRoot'),this.SliceURL);
+      var SliceForm = $(Event.target).parents('form').first();
+      
+      
+      if (this.SliceForm) {
+         if ($(SliceForm).attr('jsaction'))
+            var SliceURL = $(SliceForm).attr('jsaction');
+         else
+            var SliceURL = $(SliceForm).attr('action');
+      } else {
+         var SliceURL = this.SliceURL;
+      }
+      
+      SliceURL = gdn.url(SliceURL);
+      
       jQuery.ajax({
          url: SliceURL,
          type: 'POST',
@@ -122,65 +125,90 @@ function Gdn_Slice(SliceElement, SliceID) {
    }
    
    Gdn_Slice.prototype.GotSlice = function(Data, Status, XHR) {
-      this.Slice.animate({
-         'padding': '0px'
-      });
-      var SliceHolder = document.createElement('div');
-      $(SliceHolder).html(Data);
-      
-      // Configs
-      var SliceConfig = $(SliceHolder).find('.Slice .SliceConfig');
-      if (SliceConfig.length) {
-         var SliceConfig = $.parseJSON(SliceConfig.html());
-         $(SliceConfig.css).each(function(i,el){
-            var v_css  = document.createElement('link');
-         	v_css.rel = 'stylesheet'
-         	v_css.type = 'text/css';
-         	v_css.href = gdn.combinePaths(gdn.definition('WebRoot'),el);
-         	document.getElementsByTagName('head')[0].appendChild(v_css);
-         });
-         
-         $(SliceConfig.js).each(function(i,el){
-            var v_js  = document.createElement('script');
-         	v_js.type = 'text/javascript';
-         	v_js.href = gdn.combinePaths(gdn.definition('WebRoot'),el);
-         	document.getElementsByTagName('head')[0].appendChild(v_js);
-         });
+   
+      var DataObj = $(Data);
+      if (!DataObj.find('.Slice').length && !DataObj.hasClass('Slice')) {
+         // The slice isn't wrapped in anything so just put it inside the existing slice div.
+         var SliceWrap = this.Slice.clone().empty().append(DataObj);
+         DataObj = SliceWrap;
       }
-      
-      var SliceContents = $(SliceHolder).find('.Slice');
+   
       this.Slice.find('.SliceOverlay').fadeTo('fast', 0,jQuery.proxy(function(){
          this.Slice.css({
             'height': '',
             'width': ''
          });
-         this.Slice.html(SliceContents.html());
+         
+         this.Slice.html('');
+         for (var i = 0; i < DataObj.length; i++) {
+            
+            if (DataObj[i].tagName !== 'SCRIPT') {
+               this.Slice.append($(DataObj[i]).html());
+            } else {
+               eval($(DataObj[i]).text());
+            }
+         }
+         
+         var SliceConfig = this.Slice.find('.SliceConfig').first();
+         if (SliceConfig.length) {
+            SliceConfig = $.parseJSON(SliceConfig.html());
+            $(SliceConfig.css).each(function(i,el){
+               var v_css  = document.createElement('link');
+               v_css.rel = 'stylesheet'
+               v_css.type = 'text/css';
+               v_css.href = gdn.url(el);
+               document.getElementsByTagName('head')[0].appendChild(v_css);
+            });
+            
+            $(SliceConfig.js).each(function(i,el){
+               var v_js  = document.createElement('script');
+               v_js.type = 'text/javascript';
+               v_js.src = gdn.url(el);
+               document.getElementsByTagName('head')[0].appendChild(v_js);
+            });
+         }
+         
          this.ParseSlice();
       },this));
    }
    
    Gdn_Slice.prototype.ParseSlice = function() {
       this.SliceURL = this.Slice.attr('rel');
-      Gdn_Slices.Load(this.Slice);
       
-      //this.SliceFields = [];
       this.Slice.find('input.SliceSubmit').each(jQuery.proxy(function(i,Input){
          if ($(Input).parents('.Slice').attr('slice') != this.SliceID) return;
          
          $(Input).one('click',jQuery.proxy(this.PostSlice,this));
-         var SliceForm = $(Input).parents('form');
-         SliceForm.get(0).SliceFields = [];
-         SliceForm.find('input').each(jQuery.proxy(function(i,LoopedInput){
-            SliceForm.get(0).SliceFields.push(LoopedInput);
+         var SliceForm = $(Input).parents('form').first()[0];
+         
+         this.SliceForm = false;
+         if ($(Input).hasClass('SliceForm'))
+            this.SliceForm = true;
+         
+         SliceForm.SliceFields = [];
+         $(SliceForm).find('input').each(jQuery.proxy(function(i,LoopedInput){
+            SliceForm.SliceFields.push(LoopedInput);
          },this));
       },this));
+      
+      jQuery(document).trigger('SliceReady');
+      
+      // Load potential inner slices
+      Gdn_Slices.Load(this.Slice);
    }
    
    Gdn_Slice.prototype.GetSliceData = function(SliceForm) {
+      SliceForm = $(SliceForm).first()[0];
       var SubmitData = {'DeliveryType':'VIEW'};
-      $($(SliceForm).get(0).SliceFields).each(jQuery.proxy(function(i,Field){
+      $(SliceForm.SliceFields).each(jQuery.proxy(function(i,Field){
          Field = $(Field);
-         SubmitData[Field.attr('name')] = Field.val();
+         
+         if (Field.attr('type').toLowerCase() == 'checkbox') {
+            if (Field.attr('checked'))
+               SubmitData[Field.attr('name')] = Field.val();
+         } else {
+            SubmitData[Field.attr('name')] = Field.val();
+         }
       },this));
       return SubmitData;
    }

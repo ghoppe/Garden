@@ -117,22 +117,25 @@ $Construct->Table('UserAuthentication')
 $Construct->Table('UserAuthenticationProvider')
    ->Column('AuthenticationKey', 'varchar(64)', FALSE, 'primary')
    ->Column('AuthenticationSchemeAlias', 'varchar(32)', FALSE)
-   ->Column('URL', 'varchar(255)', FALSE)
+   ->Column('URL', 'varchar(255)', TRUE)
    ->Column('AssociationSecret', 'text', FALSE)
    ->Column('AssociationHashMethod', array('HMAC-SHA1','HMAC-PLAINTEXT'), FALSE)
+   ->Column('AuthenticateUrl', 'varchar(255)', TRUE)
    ->Column('RegisterUrl', 'varchar(255)', TRUE)
    ->Column('SignInUrl', 'varchar(255)', TRUE)
    ->Column('SignOutUrl', 'varchar(255)', TRUE)
+   ->Column('PasswordUrl', 'varchar(255)', TRUE)
+   ->Column('ProfileUrl', 'varchar(255)', TRUE)
    ->Set($Explicit, $Drop);
 
 $Construct->Table('UserAuthenticationNonce')
    ->Column('Nonce', 'varchar(200)', FALSE, 'primary')
-   ->Column('Token', 'varchar(64)', FALSE)
+   ->Column('Token', 'varchar(128)', FALSE)
    ->Column('Timestamp', 'timestamp', FALSE)
    ->Set($Explicit, $Drop);
 
 $Construct->Table('UserAuthenticationToken')
-   ->Column('Token', 'varchar(64)', FALSE, 'primary')
+   ->Column('Token', 'varchar(128)', FALSE, 'primary')
    ->Column('ProviderKey', 'varchar(64)', FALSE, 'primary')
    ->Column('ForeignUserKey', 'varchar(255)', TRUE)
    ->Column('TokenSecret', 'varchar(64)', FALSE)
@@ -175,19 +178,39 @@ $PermissionModel->Define(array(
 	'Garden.Users.Edit',
 	'Garden.Users.Delete',
 	'Garden.Users.Approve',
-	'Garden.Activity.Delete'
+	'Garden.Activity.Delete',
+	'Garden.Activity.View' => 1,
+	'Garden.Profiles.View' => 1
+	));
+	
+// Set initial guest permissions.
+$PermissionModel->Save(array(
+	'RoleID' => 2,
+	'Garden.Activity.View' => 1,
+	'Garden.Profiles.View' => 1
+	));
+	
+// Set initial applicant permissions.
+$PermissionModel->Save(array(
+	'RoleID' => 4,
+	'Garden.Activity.View' => 1,
+	'Garden.Profiles.View' => 1
 	));
 
 // Set initial member permissions.
 $PermissionModel->Save(array(
 	'RoleID' => 8,
-	'Garden.SignIn.Allow' => 1
+	'Garden.SignIn.Allow' => 1,
+	'Garden.Activity.View' => 1,
+	'Garden.Profiles.View' => 1
 	));
 
 // Set initial moderator permissions.
 $PermissionModel->Save(array(
 	'RoleID' => 32,
-	'Garden.SignIn.Allow' => 1
+	'Garden.SignIn.Allow' => 1,
+	'Garden.Activity.View' => 1,
+	'Garden.Profiles.View' => 1
 	));
 
 // Set initial admininstrator permissions.
@@ -206,7 +229,9 @@ $PermissionModel->Save(array(
 	'Garden.Users.Edit' => 1,
 	'Garden.Users.Delete' => 1,
 	'Garden.Users.Approve' => 1,
-	'Garden.Activity.Delete' => 1
+	'Garden.Activity.Delete' => 1,
+	'Garden.Activity.View' => 1,
+   'Garden.Profiles.View' => 1
 	));
 
 // Photo Table
@@ -321,7 +346,8 @@ if ($PhotoIDExists) {
 
 $Construct->Table('Tag')
 	->PrimaryKey('TagID')
-   ->Column('Name', 'varchar(255)')
+   ->Column('Name', 'varchar(255)', 'unique')
    ->Column('InsertUserID', 'int', TRUE, 'key')
    ->Column('DateInserted', 'datetime')
+   ->Engine('InnoDB')
    ->Set($Explicit, $Drop);

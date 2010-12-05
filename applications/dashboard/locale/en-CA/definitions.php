@@ -8,7 +8,6 @@ You should have received a copy of the GNU General Public License along with Gar
 Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
 */
 
-
 /**
  * English version of object possession. (ie. "Bob's thing" VS "Jess' thing").
  *
@@ -26,8 +25,8 @@ if (!function_exists('Plural')) {
    }
 }
 
-
 $Definition['Locale'] = 'en-CA';
+$Definition['_Locale'] = 'Locale';
 
 // THESE ARE RELATED TO VALIDATION FUNCTIONS IN /garden/library/core/validation.functions.php
 $Definition['ValidateRegex'] = '%s does not appear to be in the correct format.';
@@ -47,6 +46,7 @@ $Definition['ValidateOneOrMoreArrayItemRequired'] = 'You must select at least on
 $Definition['ValidateConnection'] = 'The connection parameters you specified failed to open a connection to the database. The database reported the following error: <code>%s</code>';
 $Definition['ValidateMinimumAge'] = 'You must be at least 16 years old to proceed.';
 $Definition['ValidateMatch'] = 'The %s fields do not match.';
+$Definition['ValidateVersion'] = 'The %s field is not a valid version number. See the php version_compare() function for examples of valid version numbers.';
 
 $Definition['ErrorPermission'] = 'Sorry, permission denied.';
 $Definition['ErrorCredentials'] = 'Sorry, no account could be found related to the email and password you entered.';
@@ -100,6 +100,26 @@ $Definition['EmailPassword'] = 'Hello %1$s,
   Url: %4$s
 
 Have a great day!';
+$Definition['EmailWelcomeRegister'] = 'Hello {User.Name},
+
+You have successfully registered for an account at {Title}. Here is your information:
+
+  Username: {User.Name}
+  Email: {User.Email}
+
+You can access the site at {/,url,domain}.
+
+Have a great day!';
+$Definition['EmailWelcomeConnect'] = 'Hello {User.Name},
+
+You have successfully connected to {Title}. Here is your information:
+
+  Username: {User.Name}
+  Connected With: {ProviderName}
+
+You can access the site at {/,url,domain}.
+
+Have a great day!';
 $Definition['PasswordRequest'] = 'Hello %1$s,
 
 Someone has requested to reset your password at %2$s. To reset your password, follow this link:
@@ -115,8 +135,9 @@ Follow the link below to check it out:
 Have a great day!';
 $Definition['EmailStoryNotification'] = '%1$s
 
-"%3$s"
+%3$s
 
+---
 Follow the link below to check it out:
 %2$s
 
@@ -130,6 +151,6 @@ $Definition['Date.DefaultDayFormat'] = '%B %e';
 $Definition['Date.DefaultYearFormat'] = '%B %Y';
 $Definition['Date.DefaultTimeFormat'] = '%l:%M%p';
 $Definition['Saved'] = 'Your changes have been saved.';
-$Definition['%s New Plural'] = '%s New';
+$Definition['%s New Plural'] = '%s new';
 
 // TODO: PROVIDE TRANSLATIONS FOR ALL CONFIGURATION SETTINGS THAT ARE EDITABLE ON ADMIN FORMS (ie. Vanilla.Comments.MaxLength, etc).

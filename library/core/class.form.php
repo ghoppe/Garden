@@ -156,7 +156,7 @@ class Gdn_Form {
       $Input = $this->Input($FieldName, 'checkbox', $Attributes);
       if ($Label != '') $Input = '<label for="' . ArrayValueI('id', $Attributes,
          $this->EscapeID($FieldName, FALSE)) . '" class="CheckBoxLabel">' . $Input . ' ' .
-          $Label . '</label>';
+          T($Label) . '</label>';
 
       return $Input;
    }
@@ -599,7 +599,7 @@ class Gdn_Form {
       $Input = $this->Input($FieldName, 'radio', $Attributes);
       if ($Label != '') $Input = '<label for="' . ArrayValueI('id', $Attributes,
          $this->EscapeID($FieldName, FALSE)) . '" class="RadioLabel">' . $Input . ' ' .
-          $Label . '</label>';
+          T($Label) . '</label>';
 
       return $Input;
    }
@@ -679,9 +679,12 @@ class Gdn_Form {
          foreach($this->_ValidationResults as $FieldName => $Problems) {
             $Count = count($Problems);
             for($i = 0; $i < $Count; ++$i) {
-               $Return .= '<li>' . sprintf(
-                  T($Problems[$i]),
-                  T($FieldName)) . "</li>\n";
+               if (substr($Problems[$i], 0, 1) == '@')
+                  $Return .= '<li>'.substr($Problems[$i], 1)."</li>\n";
+               else
+                  $Return .= '<li>' . sprintf(
+                     T($Problems[$i]),
+                     T($FieldName)) . "</li>\n";
             }
          }
          $Return .= "</ul>\n</div>\n";
@@ -784,16 +787,21 @@ class Gdn_Form {
          
       $this->Action = $ActionFromAttributes === FALSE ? $this->Action : $ActionFromAttributes;
 
-      if (!C('Garden.RewriteUrls') && strcasecmp($this->Method, 'get') == 0) {
+      if (strcasecmp($this->Method, 'get') == 0) {
          // The path is not getting passed on get forms so put them in hidden fields.
          $Action = strrchr($this->Action, '?');
-         $this->Action = substr($this->Action, 0, -strlen($Action));
-         parse_str(trim($Action, '?'), $Query);
-         $Hiddens = '';
-         foreach ($Query as $Key => $Value) {
-            $Key = Gdn_Format::Form($Key);
-            $Value = Gdn_Format::Form($Value);
-            $Hiddens .= "\n<input type=\"hidden\" name=\"$Key\" value=\"$Value\" />";
+         $Exclude = GetValue('Exclude', $Attributes, array());
+         if ($Action !== FALSE) {
+            $this->Action = substr($this->Action, 0, -strlen($Action));
+            parse_str(trim($Action, '?'), $Query);
+            $Hiddens = '';
+            foreach ($Query as $Key => $Value) {
+               if (in_array($Key, $Exclude))
+                  continue;
+               $Key = Gdn_Format::Form($Key);
+               $Value = Gdn_Format::Form($Value);
+               $Hiddens .= "\n<input type=\"hidden\" name=\"$Key\" value=\"$Value\" />";
+            }
          }
       }
 
@@ -1323,6 +1331,29 @@ class Gdn_Form {
       $this->_Model->DefineSchema();
       if ($this->_Model->Validation->Validate($this->FormValues()) === FALSE) $this->_ValidationResults = $this->_Model->ValidationResults();
       return $this->ErrorCount();
+   }
+
+   /**
+    * Validates a rule on the form and adds its result to the errors collection.
+    *
+    * @param string $FieldName The name of the field to validate.
+    * @param string|array $Rule The rule to validate against.
+    * @param string $CustomError A custom error string.
+    * @return bool Whether or not the rule succeeded.
+    *
+    * @see Gdn_Validation::ValidateRule()
+    */
+   public function ValidateRule($FieldName, $Rule, $CustomError = '') {
+      $Value = $this->GetFormValue($FieldName);
+      $Valid = Gdn_Validation::ValidateRule($Value, $FieldName, $Rule, $CustomError);
+
+      if ($Valid === TRUE)
+         return TRUE;
+      else {
+         $this->AddError('@'.$Valid);
+         return FALSE;
+      }
+      
    }
 
    /**

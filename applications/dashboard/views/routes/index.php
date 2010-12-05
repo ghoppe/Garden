@@ -3,10 +3,11 @@ $Session = Gdn::Session();
 ?>
 <h1><?php echo T('Manage Routes'); ?></h1>
 <div class="Info"><?php
-   echo T('Routes can be used to redirect users to various parts of your site depending on the url. ');
-   echo Anchor('Get more information on creating custom routes', 'http://vanillaforums.org/page/routes');
+   echo T('Routes can be used to redirect users to various parts of your site depending on the url.'),
+   ' ',
+   Anchor(T('Get more information on creating custom routes'), 'http://vanillaforums.org/page/routes');
 ?></div>
-<div class="FilterMenu"><?php echo Anchor('Add Route', 'dashboard/routes/add', 'AddRoute SmallButton'); ?></div>
+<div class="FilterMenu"><?php echo Anchor(T('Add Route'), 'dashboard/routes/add', 'AddRoute SmallButton'); ?></div>
 <table class="AltColumns" id="RouteTable">
    <thead>
       <tr>
@@ -31,9 +32,9 @@ foreach ($this->MyRoutes as $Route => $RouteData) {
          <strong><?php echo $Route; ?></strong>
          <div>
          <?php
-         echo Anchor('Edit', '/dashboard/routes/edit/'.trim($RouteData['Key'], '='), 'EditRoute SmallButton');
+         echo Anchor(T('Edit'), '/dashboard/routes/edit/'.trim($RouteData['Key'], '='), 'EditRoute SmallButton');
          if (!$Reserved)
-            echo Anchor('Delete', '/routes/delete/'.trim($RouteData['Key']. '=').'/'.$Session->TransientKey(), 'DeleteRoute SmallButton');
+            echo Anchor(T('Delete'), '/routes/delete/'.trim($RouteData['Key']. '=').'/'.$Session->TransientKey(), 'DeleteRoute SmallButton');
 
          ?>
          </div>

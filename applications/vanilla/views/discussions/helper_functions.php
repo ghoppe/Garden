@@ -5,24 +5,15 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
    $CssClass .= $Discussion->Bookmarked == '1' ? ' Bookmarked' : '';
    $CssClass .= $Alt.' ';
    $CssClass .= $Discussion->Announce == '1' ? ' Announcement' : '';
+   $CssClass .= $Discussion->Dismissed == '1' ? ' Dismissed' : '';
    $CssClass .= $Discussion->InsertUserID == $Session->UserID ? ' Mine' : '';
-   $CountUnreadComments = 0;
-   if (is_numeric($Discussion->CountUnreadComments))
-      $CountUnreadComments = $Discussion->CountUnreadComments;
-      
-   // Logic for incomplete comment count.
-   if($Discussion->CountCommentWatch == 0 && $DateLastViewed = GetValue('DateLastViewed', $Discussion)) {
-      if(Gdn_Format::ToTimestamp($DateLastViewed) >= Gdn_Format::ToTimestamp($Discussion->LastDate)) {
-         $CountUnreadComments = 0;
-         $Discussion->CountCommentWatch = $Discussion->CountComments;
-      } else {
-         $CountUnreadComments = '';
-      }
-   }
-   $CssClass .= ($CountUnreadComments > 0 && $Session->IsValid()) ? ' New' : '';
+   $CssClass .= ($Discussion->CountUnreadComments > 0 && $Session->IsValid()) ? ' New' : '';
    $Sender->EventArguments['Discussion'] = &$Discussion;
    $First = UserBuilder($Discussion, 'First');
    $Last = UserBuilder($Discussion, 'Last');
+   
+   $Sender->FireEvent('BeforeDiscussionName');
+   
    $DiscussionName = Gdn_Format::Text($Discussion->Name);
    if ($DiscussionName == '')
       $DiscussionName = T('Blank Discussion Topic');
@@ -50,12 +41,8 @@ function WriteDiscussion($Discussion, &$Sender, &$Session, $Alt) {
          <?php } ?>
          <span class="CommentCount"><?php printf(Plural($Discussion->CountComments, '%s comment', '%s comments'), $Discussion->CountComments); ?></span>
          <?php
-            if ($Session->IsValid()) {
-               if ($CountUnreadComments == $Discussion->CountComments)
-                  echo '<strong>'.T('New').'</strong>';
-               else if ($CountUnreadComments > 0)
-                  echo '<strong>'.Plural($CountUnreadComments, '%s New', '%s New Plural').'</strong>';
-            }
+            if ($Session->IsValid() && $Discussion->CountUnreadComments > 0)
+               echo '<strong>'.Plural($Discussion->CountUnreadComments, '%s New', '%s New Plural').'</strong>';
 
             if ($Discussion->LastCommentID != '') {
                echo '<span class="LastCommentBy">'.sprintf(T('Most recent by %1$s'), UserAnchor($Last)).'</span>';
@@ -91,10 +78,10 @@ function WriteFilterTabs(&$Sender) {
       $CountDrafts = $Session->User->CountDrafts;
    }
    if (is_numeric($CountBookmarks) && $CountBookmarks > 0)
-      $Bookmarked .= '<span>'.$CountBookmarks.'</span>';            
+      $Bookmarked .= '<span>'.$CountBookmarks.'</span>';
 
    if (is_numeric($CountDiscussions) && $CountDiscussions > 0)
-      $MyDiscussions .= '<span>'.$CountDiscussions.'</span>';            
+      $MyDiscussions .= '<span>'.$CountDiscussions.'</span>';
 
    if (is_numeric($CountDrafts) && $CountDrafts > 0)
       $MyDrafts .= '<span>'.$CountDrafts.'</span>';
@@ -154,7 +141,7 @@ function WriteOptions($Discussion, &$Sender, &$Session) {
       $Sender->Options = '';
       
       // Dismiss an announcement
-      if ($Discussion->Announce == '1' && $Discussion->Dismissed != '1')
+      if (C('Vanilla.Discussions.Dismiss', 1) && $Discussion->Announce == '1' && $Discussion->Dismissed != '1')
          $Sender->Options .= '<li>'.Anchor(T('Dismiss'), 'vanilla/discussion/dismissannouncement/'.$Discussion->DiscussionID.'/'.$Session->TransientKey(), 'DismissAnnouncement') . '</li>';
       
       // Edit discussion

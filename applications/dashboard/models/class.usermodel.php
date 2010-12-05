@@ -18,6 +18,43 @@ class UserModel extends Gdn_Model {
    public function __construct() {
       parent::__construct('User');
    }
+
+   /** Connect a user with a foreign authentication system.
+    *
+    * @param string $ForeignUserKey The user's unique key in the other authentication system.
+    * @param string $ProviderKey The key of the system providing the authentication.
+    * @param array $UserData Data to go in the user table.
+    * @return int The new/existing user ID.
+    */
+   public function Connect($ForeignUserKey, $ProviderKey, $UserData) {
+      if (!isset($UserData['UserID'])) {
+         // Check to see if the user already exists.
+         $ConnectUserID = $this->SQL->GetWhere('UserAuthentication',
+            array('ForeignUserKey' => $ForeignUserKey, 'ProviderKey' => $ProviderKey))
+            ->Value('UserID', FALSE);
+
+         if ($ConnectUserID !== FALSE)
+            $UserData['UserID'] = $ConnectUserID;
+      }
+
+      $NewUser = !isset($ConnectUserID) && !GetValue('UserID', $UserData);
+
+      // Save the user.
+      $UserID = $this->Save($UserData, array('ActivityType' => 'Join', 'CheckExisting' => TRUE));
+
+      // Add the user to the default role(s).
+      if ($UserID && $NewUser) {
+         $this->SaveRoles($UserID, C('Garden.Registration.DefaultRoles'));
+      }
+
+      // Save the authentication.
+      if ($UserID && !isset($ConnectUserID)) {
+         $this->SQL->Replace('UserAuthentication',
+            array('UserID' => $UserID),
+            array('ForeignUserKey' => $ForeignUserKey, 'ProviderKey' => $ProviderKey));
+      }
+      return $UserID;
+   }
    
    /**
     * A convenience method to be called when inserting users (because users
@@ -79,7 +116,10 @@ class UserModel extends Gdn_Model {
 
    public function Get($UserID) {
       $this->UserQuery();
-      return $this->SQL->Where('u.UserID', $UserID)->Get()->FirstRow();
+      $User = $this->SQL->Where('u.UserID', $UserID)->Get()->FirstRow();
+      $this->SetCalculatedFields($User);
+
+      return $User;
    }
    
    public function GetByUsername($Username) {
@@ -87,11 +127,15 @@ class UserModel extends Gdn_Model {
 		 	return FALSE;
 			
       $this->UserQuery();
-      return $this->SQL->Where('u.Name', $Username)->Get()->FirstRow();
+      $User = $this->SQL->Where('u.Name', $Username)->Get()->FirstRow();
+      $this->SetCalculatedFields($User);
+      return $User;
    }
 	public function GetByEmail($Email) {
       $this->UserQuery();
-      return $this->SQL->Where('u.Email', $Email)->Get()->FirstRow();
+      $User = $this->SQL->Where('u.Email', $Email)->Get()->FirstRow();
+      $this->SetCalculatedFields($User);
+      return $User;
    }
 
    public function GetActiveUsers($Limit = 5) {
@@ -115,6 +159,18 @@ class UserModel extends Gdn_Model {
          ->GroupBy('UserID')
          ->OrderBy('DateInserted', 'desc')
          ->Get();
+   }
+
+   /**
+    * Get the a user authentication row.
+    *
+    * @param string $UniqueID The unique ID of the user in the foreign authentication scheme.
+    * @param string $Provider The key of the provider.
+    * @return array|false
+    */
+   public function GetAuthentication($UniqueID, $Provider) {
+      return $this->SQL->GetWhere('UserAuthentication',
+         array('ForeignUserKey' => $UniqueID, 'ProviderKey' => $Provider))->FirstRow(DATASET_TYPE_ARRAY);
    }
 
    public function GetCountLike($Like = FALSE) {
@@ -300,8 +356,21 @@ class UserModel extends Gdn_Model {
    
                // Record activity if the person changed his/her photo
                $Photo = ArrayValue('Photo', $FormPostValues);
-               if ($Photo !== FALSE)
-                  AddActivity($UserID, 'PictureChange', '<img src="'.Asset('uploads/'.ChangeBasename($Photo, 't%s')).'" alt="'.T('Thumbnail').'" />');
+               if ($Photo !== FALSE) {
+                  if (GetValue('CheckExisting', $Settings)) {
+                     $User = $this->Get($UserID);
+                     $OldPhoto = GetValue('Photo', $User);
+                  }
+
+                  if (!isset($OldPhoto) || $Photo != $Photo) {
+                     if (strpos($Photo, '//'))
+                        $PhotoUrl = $Photo;
+                     else
+                        $PhotoUrl = Asset('uploads/'.ChangeBasename($Photo, 't%s'));
+
+                     AddActivity($UserID, 'PictureChange', '<img src="'.$PhotoUrl.'" alt="'.T('Thumbnail').'" />');
+                  }
+               }
    
             } else {
                $RecordRoleChange = FALSE;
@@ -321,7 +390,7 @@ class UserModel extends Gdn_Model {
                $Session = Gdn::Session();
                AddActivity(
                   $UserID,
-                  'JoinCreated',
+                  GetValue('ActivityType', $Settings, 'JoinCreated'),
                   T('Welcome Aboard!'),
                   $Session->UserID > 0 ? $Session->UserID : ''
                );
@@ -698,7 +767,7 @@ class UserModel extends Gdn_Model {
    /**
     * To be used for basic registration, and captcha registration
     */
-   public function InsertForBasic($FormPostValues) {
+   public function InsertForBasic($FormPostValues, $CheckCaptcha = TRUE) {
       $UserID = FALSE;
 
       // Define the primary key in this model's table.
@@ -723,7 +792,7 @@ class UserModel extends Gdn_Model {
          $Fields['Password'] = array('md5' => $Fields['Password']);
 
          // If in Captcha registration mode, check the captcha value
-         if (Gdn::Config('Garden.Registration.Method') == 'Captcha') {
+         if ($CheckCaptcha && Gdn::Config('Garden.Registration.Method') == 'Captcha') {
             $CaptchaPublicKey = ArrayValue('Garden.Registration.CaptchaPublicKey', $FormPostValues, '');
             $CaptchaValid = ValidateCaptcha($CaptchaPublicKey);
             if ($CaptchaValid !== TRUE) {
@@ -901,18 +970,22 @@ class UserModel extends Gdn_Model {
          $Where['UserID <> '] = $UserID;
 
       // Make sure the username & email aren't already being used
-      $Where['Name'] = $Username;
-      $TestData = $this->GetWhere($Where);
-      if ($TestData->NumRows() > 0) {
-         $this->Validation->AddValidationResult('Name', 'The name you entered is already in use by another member.');
-         $Valid = FALSE;
+      if (C('Garden.Registration.NameUnique', TRUE)) {
+         $Where['Name'] = $Username;
+         $TestData = $this->GetWhere($Where);
+         if ($TestData->NumRows() > 0) {
+            $this->Validation->AddValidationResult('Name', 'The name you entered is already in use by another member.');
+            $Valid = FALSE;
+         }
+         unset($Where['Name']);
       }
-      unset($Where['Name']);
-      $Where['Email'] = $Email;
-      $TestData = $this->GetWhere($Where);
-      if ($TestData->NumRows() > 0) {
-         $this->Validation->AddValidationResult('Email', 'The email you entered in use by another member.');
-         $Valid = FALSE;
+      if (C('Garden.Registration.EmailUnique')) {
+         $Where['Email'] = $Email;
+         $TestData = $this->GetWhere($Where);
+         if ($TestData->NumRows() > 0) {
+            $this->Validation->AddValidationResult('Email', 'The email you entered is in use by another member.');
+            $Valid = FALSE;
+         }
       }
       return $Valid;
    }
@@ -1258,6 +1331,30 @@ class UserModel extends Gdn_Model {
       return $this->SaveToSerializedColumn('Attributes', $UserID, $Attribute, $Value);
    }
 
+   public function SaveAuthentication($Data) {
+      $Cn = $this->Database->Connection();
+      $Px = $this->Database->DatabasePrefix;
+
+      $UID = $Cn->quote($Data['UniqueID']);
+      $Provider = $Cn->quote($Data['Provider']);
+      $UserID = $Cn->quote($Data['UserID']);
+
+      $Sql = "insert {$Px}UserAuthentication (ForeignUserKey, ProviderKey, UserID) values ($UID, $Provider, $UserID) on duplicate key update UserID = $UserID";
+      $Result = $this->Database->Query($Sql);
+      return $Result;
+   }
+
+   public function SetCalculatedFields(&$User) {
+      if ($v = GetValue('Attributes', $User))
+         SetValue('Attributes', $User, @unserialize($v));
+      if ($v = GetValue('Permissions', $User))
+         SetValue('Permissions', $User, @unserialize($v));
+      if ($v = GetValue('Preferences', $User))
+         SetValue('Preferences', $User, @unserialize($v));
+      if ($v = GetValue('Photo', $User))
+         SetValue('PhotoUrl', $User, Asset('uploads/'.$v, TRUE));
+   }
+
    public function SetTransientKey($UserID, $ExplicitKey = '') {
       $Key = $ExplicitKey == '' ? RandomString(12) : $ExplicitKey;
       $this->SaveAttribute($UserID, 'TransientKey', $Key);
@@ -1281,7 +1378,7 @@ class UserModel extends Gdn_Model {
       return $DefaultValue;
    }
 
-   public function SendWelcomeEmail($UserID, $Password) {
+   public function SendWelcomeEmail($UserID, $Password, $RegisterType = 'Add', $AdditionalData = NULL) {
       $Session = Gdn::Session();
       $Sender = $this->Get($Session->UserID);
       $User = $this->Get($UserID);
@@ -1289,18 +1386,32 @@ class UserModel extends Gdn_Model {
       $Email = new Gdn_Email();
       $Email->Subject(sprintf(T('[%s] Welcome Aboard!'), $AppTitle));
       $Email->To($User->Email);
-      //$Email->From($Sender->Email, $Sender->Name);
-      $Email->Message(
-         sprintf(
-            T('EmailWelcome'),
-            $User->Name,
-            $Sender->Name,
-            $AppTitle,
-            Gdn_Url::WebRoot(TRUE),
-            $Password,
-            $User->Email
-         )
-      );
+
+      // Check for the new email format.
+      if (($EmailFormat = T("EmailWelcome{$RegisterType}", '#')) != '#') {
+         $Data = array();
+         $Data['User'] = ArrayTranslate((array)$User, array('Name', 'Email'));
+         $Data['Sender'] = ArrayTranslate((array)$Sender, array('Name', 'Email'));
+         $Data['Title'] = $AppTitle;
+         if (is_array($AdditionalData))
+            $Data = array_merge($Data, $AdditionalData);
+
+         $Message = FormatString($EmailFormat, $Data);
+         $Email->Message($Message);
+      } else {
+         $Email->Message(
+            sprintf(
+               T('EmailWelcome'),
+               $User->Name,
+               $Sender->Name,
+               $AppTitle,
+               Gdn_Url::WebRoot(TRUE),
+               $Password,
+               $User->Email
+            )
+         );
+      }
+
       $Email->Send();
    }
 
@@ -1365,8 +1476,10 @@ class UserModel extends Gdn_Model {
          }
 
          if ($UserID) {
+            $RoleID = $this->NewUserRoleIDs();
+            
             // Save the roles.
-            $Roles = ArrayValue('Roles', $Data, Gdn::Config('Garden.Registration.DefaultRoles'));
+            $Roles = (array)GetValue('Roles', $Data, $RoleID);
             $this->SaveRoles($UserID, $Roles, FALSE);
          }
       } else {
@@ -1380,6 +1493,30 @@ class UserModel extends Gdn_Model {
       return $UserID;
    }
    
+   public function NewUserRoleIDs() {
+      // Registration method
+      $RegistrationMethod = C('Garden.Registration.Method', 'Captcha');
+      $DefaultRoleID = C('Garden.Registration.DefaultRoles');
+      switch ($RegistrationMethod) {
+      
+         case 'Approval':
+            $RoleID = C('Garden.Registration.ApplicantRoleID', $DefaultRoleID);
+         break;
+         
+         case 'Invitation':
+            throw new Gdn_UserException(T('This forum is currently set to invitation only mode.'));
+         break;
+         
+         case 'Basic':
+         case 'Captcha':
+         default:
+            $RoleID = $DefaultRoleID;
+         break;
+      }
+      
+      return $RoleID;
+   }
+   
    public function PasswordRequest($Email) {
       $User = $this->GetWhere(array('Email' => $Email))->FirstRow();
       if (!is_object($User) || $Email == '')
@@ -1387,7 +1524,7 @@ class UserModel extends Gdn_Model {
       
       $PasswordResetKey = RandomString(6);
       $this->SaveAttribute($User->UserID, 'PasswordResetKey', $PasswordResetKey);
-      $AppTitle = Gdn::Config('Garden.Title');
+      $AppTitle = C('Garden.Title');
       $Email = new Gdn_Email();
       $Email->Subject(sprintf(T('[%s] Password Reset Request'), $AppTitle));
       $Email->To($User->Email);

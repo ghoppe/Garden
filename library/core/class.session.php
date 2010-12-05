@@ -107,7 +107,7 @@ class Gdn_Session {
          return TRUE;
       
       $Permissions = $this->GetPermissions();      
-      if(is_numeric($JunctionID) && $JunctionID > 0 && !C('Garden.Permissions.Disabled'.$JunctionTable)) {
+      if(is_numeric($JunctionID) && $JunctionID > 0 && !C('Garden.Permissions.Disabled.'.$JunctionTable)) {
          // Junction permission ($Permissions[PermissionName] = array(JunctionIDs))
          if (is_array($Permission)) {
             foreach ($Permission as $PermissionName) {
@@ -153,6 +153,27 @@ class Gdn_Session {
    public function GetPermissions() {
       return is_array($this->_Permissions) ? $this->_Permissions : array();
    }
+   
+	/**
+    * 
+    * 
+	* @todo Add description.
+	* @param string|array $PermissionName
+	* @param mixed $Value
+	* @return NULL
+	*/
+	
+	public function SetPermission($PermissionName, $Value = FALSE) {
+		if (is_string($PermissionName)) {
+			if ($Value === FALSE) $this->_Permissions[] = $PermissionName;
+			elseif (is_array($Value)) $this->_Permissions[$PermissionName] = $Value;
+		} elseif (is_array($PermissionName)) {
+			if (array_key_exists(0, $PermissionName))
+				foreach ($PermissionName as $Name) $this->SetPermission($Name);
+			else
+				foreach ($PermissionName as $Name => $Value) $this->SetPermission($Name, $Value);
+		}
+    }
 
    /**
     * Gets the currently authenticated user's preference for the specified
@@ -218,8 +239,9 @@ class Gdn_Session {
     * Authenticates the user with the provided Authenticator class.
     *
     * @param int $UserID The UserID to start the session with.
+    * @param bool $SetIdentity Whether or not to set the identity (cookie) or make this a one request session.
     */
-   public function Start($UserID = FALSE) {
+   public function Start($UserID = FALSE, $SetIdentity = TRUE) {
       if (!Gdn::Config('Garden.Installed')) return;
       // Retrieve the authenticated UserID from the Authenticator module.
       $UserModel = Gdn::Authenticator()->GetUserModel();
@@ -234,6 +256,9 @@ class Gdn_Session {
 
          if ($this->User) {
          
+            if ($UserID && $SetIdentity)
+               Gdn::Authenticator()->SetIdentity($UserID);
+         
             if (Gdn::Authenticator()->ReturningUser($this->User)) {
                $UserModel->UpdateLastVisit($this->UserID, $this->User->Attributes, $this->User->Attributes['HourOffset']);
             }
@@ -245,6 +270,7 @@ class Gdn_Session {
             $this->_Preferences = Gdn_Format::Unserialize($this->User->Preferences);
             $this->_Attributes = Gdn_Format::Unserialize($this->User->Attributes);
             $this->_TransientKey = is_array($this->_Attributes) ? ArrayValue('TransientKey', $this->_Attributes) : FALSE;
+               
             if ($this->_TransientKey === FALSE)
                $this->_TransientKey = $UserModel->SetTransientKey($this->UserID);
                
@@ -256,7 +282,8 @@ class Gdn_Session {
          } else {
             $this->UserID = 0;
             $this->User = FALSE;
-            Gdn::Authenticator()->SetIdentity(NULL);
+            if ($SetIdentity)
+               Gdn::Authenticator()->SetIdentity(NULL);
          }
       }
       // Load guest permissions if necessary

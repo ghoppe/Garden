@@ -13,7 +13,7 @@ jQuery(document).ready(function($) {
       var d = new Date();
       if (d.getHours() != $(this).val()) {
          $.post(
-            gdn.combinePaths(gdn.definition('WebRoot', ''), 'index.php?p=/utility/setclienthour/' + d.getHours() + '/' + gdn.definition('TransientKey')),
+            gdn.url('/utility/setclienthour/' + d.getHours() + '/' + gdn.definition('TransientKey')),
             'DeliveryType=BOOL'
          );
       }
@@ -21,7 +21,9 @@ jQuery(document).ready(function($) {
    
    // Hide/Reveal the "forgot your password" form if the ForgotPassword button is clicked.
    $('a.ForgotPassword').live('click', function() {
-      $('#Form_User_Password').slideToggle('fast');
+      $('.Methods').toggle();
+      $('#Form_User_Password').toggle();
+		$('#Form_User_SignIn').toggle();
       return false;
    });
    
@@ -68,7 +70,7 @@ jQuery(document).ready(function($) {
 	
    // Go to notifications if clicking on a user's notification count
    $('li.UserNotifications a span').click(function() {
-      document.location = gdn.combinePaths(gdn.definition('WebRoot', ''), 'profile/notifications');
+      document.location = gdn.url('/profile/notifications');
       return false;
    });
    
@@ -77,6 +79,25 @@ jQuery(document).ready(function($) {
    // current screen).
    if ($.fn.popup)
       $('a.Popup').popup();
+
+   $(".PopupWindow").live('click', function() {
+      var $this = $(this);
+
+      var width = $this.attr('popupWidth');
+      var height = $this.attr('popupHeight');
+      var left = (screen.width - width) / 2;
+      var top = (screen.height - height) / 2;
+
+      var id = $this.attr('id');
+      var href = $this.attr('href');
+      if ($this.attr('popupHref'))
+         href = $this.attr('popupHref');
+
+      var win = window.open(href, 'Window_' + id, "left="+left+",top="+top+",width="+width+",height="+height+",status=0,scrollbars=0");
+      if (win)
+         win.focus();
+      return false;
+   });
    
    // This turns any anchor with the "Popdown" class into an in-page pop-up, but
    // it does not hijack forms in the popup.
@@ -136,8 +157,15 @@ jQuery(document).ready(function($) {
 
    // If a page loads with a hidden redirect url, go there after a few moments.
    var RedirectUrl = gdn.definition('RedirectUrl', '');
-   if (RedirectUrl != '')
-      setTimeout("document.location = '"+RedirectUrl+"';", 2000);
+   var CheckPopup = gdn.definition('CheckPopup', '');
+   if (RedirectUrl != '') {
+      if (CheckPopup && window.opener) {
+         window.opener.location.replace(RedirectUrl);
+         window.close();
+      } else {
+         setTimeout("document.location = '"+RedirectUrl+"';", 2000);
+      }
+   }
 
    // Make tables sortable if the tableDnD plugin is present.
    if ($.tableDnD)
@@ -155,10 +183,11 @@ jQuery(document).ready(function($) {
       }});
 
    // Format email addresses
-   $('span.Email').livequery(function() {
-      var html = $(this).html();
-      var email = $(this).html().replace(/<em>dot<\/em>/ig, '.').replace(/<strong>at<\/strong>/ig, '@');
-      $(this).html('<a href="mailto:' + email + '">' + email + '</a>');
+   $('span.Email.EmailUnformatted').livequery(function() {
+      var el = $(this);
+      el.removeClass('EmailUnformatted');
+	  var email = $(this).html().replace(/<em[^>]*>dot<\/em>/ig, '.').replace(/<strong[^>]*>at<\/strong>/ig, '@');
+      el.html('<a href="mailto:' + email + '">' + email + '</a>');
    });
 
    // Make sure that the commentbox & aboutbox do not allow more than 1000 characters
@@ -292,6 +321,24 @@ jQuery(document).ready(function($) {
          return false;
       }
    });
+	
+	// Shrink large images to fit into message space, and pop into new window when clicked.
+	$('div.Message img').livequery(function() {
+		var img = $(this);
+		var container = img.parents('div.Message');
+		if (img.width() > container.width()) {
+			img.css('width', container.width()).css('cursor', 'pointer');
+			img.after('<div class="ImageResized">' + gdn.definition('ImageResized', 'This image has been resized to fit in the page. Click to enlarge.') + '</div>');
+			img.next().click(function() {
+				window.open($(img).attr('src'));
+				return false;
+			});
+			img.click(function() {
+				window.open($(this).attr('src'));
+				return false;
+			})
+		}
+	}); 
    
 });
 

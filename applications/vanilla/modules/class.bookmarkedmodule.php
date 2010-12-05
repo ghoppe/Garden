@@ -13,18 +13,11 @@ Contact Vanilla Forums Inc. at support [at] vanillaforums [dot] com
  */
 class BookmarkedModule extends Gdn_Module {
    
-   protected $_DiscussionData;
-   
-   public function __construct(&$Sender = '') {
-      $this->_DiscussionData = FALSE;
-      parent::__construct($Sender);
-   }
-   
    public function GetData($Limit = 10) {
       $Session = Gdn::Session();
       if ($Session->IsValid()) {
          $DiscussionModel = new DiscussionModel();
-         $this->_DiscussionData = $DiscussionModel->Get(
+         $this->Data = $DiscussionModel->Get(
             0,
             $Limit,
             array(
@@ -40,7 +33,7 @@ class BookmarkedModule extends Gdn_Module {
    }
 
    public function ToString() {
-      if ($this->_DiscussionData !== FALSE && $this->_DiscussionData->NumRows() > 0)
+      if (isset($this->Data) && is_object($this->Data) && $this->Data->NumRows() > 0)
          return parent::ToString();
 
       return '';
