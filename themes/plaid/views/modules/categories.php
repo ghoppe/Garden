@@ -2,8 +2,8 @@
 $CountDiscussions = 0;
 $CategoryID = isset($this->_Sender->CategoryID) ? $this->_Sender->CategoryID : '';
 
-if ($this->_CategoryData !== FALSE) {
-   foreach ($this->_CategoryData->Result() as $Category) {
+if ($this->Data !== FALSE) {
+   foreach ($this->Data->Result() as $Category) {
       $CountDiscussions = $CountDiscussions + $Category->CountDiscussions;
    }
    ?>
@@ -21,7 +21,7 @@ if ($this->_CategoryData !== FALSE) {
          
       ?>><strong><?php echo Anchor(Gdn_Format::Text(T('All Categories')), '/categories'); ?></strong> <?php echo $CountDiscussions; ?></li>
       <?php
-   foreach ($this->_CategoryData->Result() as $Category) {
+   foreach ($this->Data->Result() as $Category) {
       ?>
       <li<?php
       if ($CategoryID == $Category->CategoryID)
