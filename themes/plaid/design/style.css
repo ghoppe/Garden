@@ -904,6 +904,13 @@ ul.PanelInfo li strong {
    margin-right: 12px;
    font-weight: normal;
 }
+
+ul.PanelInfo li.Parent {
+   font-weight: bold;
+   text-align: left;
+   background: none;
+}
+
 ul.PanelInfo li a {
    float: left;
 }
@@ -1316,6 +1323,7 @@ ul.MessageList li.Item {
 ul.MessageList div.Meta {
    font-size: 11px;
    color: #777;
+   margin-bottom: 1em;
 }
 ul.MessageList div.Meta span.Author img {
    height: 40px;
